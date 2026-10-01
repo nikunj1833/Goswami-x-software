@@ -6,7 +6,38 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function Header() {
   const headerRef = useRef<HTMLElement | null>(null);
-  const { user, openAuth, signOut } = useAuth();
+  const { user, supabaseUser, openAuth, signOut } = useAuth();
+
+  const getAvatarInitial = (): string => {
+    // 1. Try profile/user full name or display name
+    const rawName =
+      user?.displayName ||
+      user?.name ||
+      (supabaseUser?.user_metadata?.full_name as string | undefined) ||
+      (supabaseUser?.user_metadata?.name as string | undefined);
+
+    if (rawName && typeof rawName === "string") {
+      const cleanName = rawName.trim();
+      if (cleanName.length > 0) {
+        // First name initial (e.g. "Nikunj Giri" -> "Nikunj" -> "N")
+        const firstName = cleanName.split(/\s+/)[0];
+        if (firstName && firstName.length > 0) {
+          return firstName.charAt(0).toUpperCase();
+        }
+      }
+    }
+
+    // 2. Fallback to first letter of email
+    const email = user?.email || supabaseUser?.email;
+    if (email && typeof email === "string") {
+      const cleanEmail = email.trim();
+      if (cleanEmail.length > 0) {
+        return cleanEmail.charAt(0).toUpperCase();
+      }
+    }
+
+    return "U";
+  };
 
   useEffect(() => {
     const header = headerRef.current;
@@ -39,7 +70,7 @@ export default function Header() {
   }, []);
 
   const handleAuthClick = () => {
-    if (user) {
+    if (user || supabaseUser) {
       signOut();
     } else {
       openAuth("signin");
@@ -129,30 +160,34 @@ export default function Header() {
         </ul>
 
         <div className="flex items-center gap-2 sm:gap-4">
-          <button
-            id="authBtn"
-            type="button"
-            className="auth-btn inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium sm:px-4 sm:text-sm"
-            style={{ borderColor: "var(--line)", color: "var(--fg)" }}
-            onClick={handleAuthClick}
-            aria-label={
-              user
-                ? `Signed in as ${user.name}. Click to sign out.`
-                : "Sign in"
-            }
-            title={user ? `${user.name} · click to sign out` : undefined}
-          >
-            {user && user.name ? (
-              <>
-                <span className="auth-avatar">
-                  {user.name.trim().charAt(0).toUpperCase()}
-                </span>
-                <span className="hidden sm:inline">Sign out</span>
-              </>
-            ) : (
-              "Sign in"
-            )}
-          </button>
+          {user || supabaseUser ? (
+            <button
+              id="authAvatarBtn"
+              type="button"
+              className="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full font-serif font-semibold text-sm transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+              style={{
+                background: "linear-gradient(135deg, var(--accent-soft), var(--accent))",
+                color: "var(--bg)",
+                border: "1.5px solid var(--line)",
+              }}
+              onClick={handleAuthClick}
+              aria-label={`Signed in as ${user?.name || user?.email || "User"}. Click to sign out.`}
+              title={`${user?.name || user?.email || "User"} · click to sign out`}
+            >
+              <span>{getAvatarInitial()}</span>
+            </button>
+          ) : (
+            <button
+              id="authBtn"
+              type="button"
+              className="auth-btn inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium sm:px-4 sm:text-sm cursor-pointer"
+              style={{ borderColor: "var(--line)", color: "var(--fg)" }}
+              onClick={handleAuthClick}
+              aria-label="Sign in"
+            >
+              Sign in
+            </button>
+          )}
 
           <ThemeToggle />
 
