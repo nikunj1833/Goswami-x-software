@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     await supabase.auth.signOut();
@@ -16,9 +16,19 @@ export async function POST() {
     message: "Logged out successfully.",
   });
 
-  // Clear any legacy session / auth cookies
+  // Clear legacy session / token cookies
   response.cookies.delete("session");
   response.cookies.delete("token");
 
+  // Explicitly clear all Supabase auth cookies
+  try {
+    request.cookies.getAll().forEach((cookie) => {
+      if (cookie.name.startsWith("sb-")) {
+        response.cookies.delete(cookie.name);
+      }
+    });
+  } catch {}
+
   return response;
 }
+

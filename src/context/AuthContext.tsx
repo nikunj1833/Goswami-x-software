@@ -126,8 +126,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(initialSession);
           setSupabaseUser(initialSession?.user ?? null);
           if (initialSession?.user) {
+            const email = initialSession.user.email || "";
+            const fallbackName =
+              (initialSession.user.user_metadata?.full_name as string | undefined) ||
+              (initialSession.user.user_metadata?.name as string | undefined) ||
+              (email ? email.split("@")[0] : "User");
+
+            // Set immediate provisional profile so UI doesn't delay
+            setUser({
+              id: initialSession.user.id,
+              uid: initialSession.user.id,
+              email,
+              displayName: fallbackName,
+              name: fallbackName,
+              phoneNumber: initialSession.user.phone || null,
+              role: "user",
+              createdAt: initialSession.user.created_at,
+            });
+
             const profile = await syncUserProfile(initialSession.user);
-            if (mounted) setUser(profile);
+            if (mounted && profile) setUser(profile);
           }
         }
       } catch (err) {
@@ -147,10 +165,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSupabaseUser(currentSession?.user ?? null);
 
       if (currentSession?.user) {
+        const email = currentSession.user.email || "";
+        const fallbackName =
+          (currentSession.user.user_metadata?.full_name as string | undefined) ||
+          (currentSession.user.user_metadata?.name as string | undefined) ||
+          (email ? email.split("@")[0] : "User");
+
+        // Immediate user profile update to avoid any render delay
+        setUser((prev) => prev ?? {
+          id: currentSession.user.id,
+          uid: currentSession.user.id,
+          email,
+          displayName: fallbackName,
+          name: fallbackName,
+          phoneNumber: currentSession.user.phone || null,
+          role: "user",
+          createdAt: currentSession.user.created_at,
+        });
+        setIsAuthOpen(false);
+
         const profile = await syncUserProfile(currentSession.user);
-        if (mounted) {
+        if (mounted && profile) {
           setUser(profile);
-          setIsAuthOpen(false);
         }
       } else {
         setUser(null);

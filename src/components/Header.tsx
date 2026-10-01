@@ -171,8 +171,8 @@ export default function Header() {
                 border: "1.5px solid var(--line)",
               }}
               onClick={handleAuthClick}
-              aria-label={`Signed in as ${user?.name || user?.email || "User"}. Click to sign out.`}
-              title={`${user?.name || user?.email || "User"} · click to sign out`}
+              aria-label={`Signed in as ${user?.name || (supabaseUser?.user_metadata?.full_name as string) || user?.email || supabaseUser?.email || "User"}. Click to sign out.`}
+              title={`${user?.name || (supabaseUser?.user_metadata?.full_name as string) || user?.email || supabaseUser?.email || "User"} · click to sign out`}
             >
               <span>{getAvatarInitial()}</span>
             </button>
