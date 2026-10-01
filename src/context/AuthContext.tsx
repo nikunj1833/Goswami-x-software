@@ -1,77 +1,170 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useSyncExternalStore } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
+import type { User as SupabaseUser, Session } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 
-export interface User {
-  name: string;
+export interface UserProfile {
+  id: string;
+  uid: string;
   email: string;
+  displayName: string;
+  name: string;
+  phoneNumber?: string | null;
+  role?: string;
+  createdAt?: string;
 }
 
-interface AuthContextType {
-  user: User | null;
+export interface AuthContextType {
+  user: UserProfile | null;
+  supabaseUser: SupabaseUser | null;
+  session: Session | null;
+  loading: boolean;
   isAuthOpen: boolean;
-  authMode: "signin" | "signup";
-  openAuth: (mode?: "signin" | "signup") => void;
+  openAuth: (mode?: string) => void;
   closeAuth: () => void;
-  setAuthMode: (mode: "signin" | "signup") => void;
-  signIn: (email: string) => { success: boolean; error?: string };
-  signUp: (name: string, email: string) => { success: boolean; error?: string };
-  signOut: () => void;
-}
-
-const STORAGE_KEY = "ng-user";
-
-let memoryUser: User | null = null;
-const listeners = new Set<() => void>();
-
-function notify() {
-  listeners.forEach((listener) => listener());
-}
-
-function subscribe(callback: () => void) {
-  listeners.add(callback);
-  const handleStorage = (e: StorageEvent) => {
-    if (e.key === STORAGE_KEY) {
-      notify();
-    }
-  };
-  window.addEventListener("storage", handleStorage);
-  return () => {
-    listeners.delete(callback);
-    window.removeEventListener("storage", handleStorage);
-  };
-}
-
-function getSnapshot(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(STORAGE_KEY);
-}
-
-function getServerSnapshot(): string | null {
-  return null;
+  signInWithGoogle: () => Promise<{ error?: string }>;
+  signInWithOtp: (email: string) => Promise<{ success: boolean; error?: string }>;
+  verifyOtp: (email: string, token: string) => Promise<{ success: boolean; error?: string }>;
+  signOut: () => Promise<void>;
+  getIdToken: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const supabase = useMemo(() => createClient(), []);
+
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
 
-  const rawUser = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  // Sync Supabase user with public.profiles record
+  const syncUserProfile = useCallback(
+    async (sbUser: SupabaseUser | null): Promise<UserProfile | null> => {
+      if (!sbUser) return null;
 
-  let user: User | null = null;
-  if (rawUser) {
-    try {
-      user = JSON.parse(rawUser);
-    } catch {
-      user = null;
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", sbUser.id)
+          .maybeSingle();
+
+        const email = sbUser.email || "";
+        const fallbackName =
+          (sbUser.user_metadata?.full_name as string | undefined) ||
+          (sbUser.user_metadata?.name as string | undefined) ||
+          (email ? email.split("@")[0] : "User");
+
+        if (!profile) {
+          // Create profile record if not present, adhering to RLS (id = auth.uid())
+          await supabase.from("profiles").insert({
+            id: sbUser.id,
+            full_name: fallbackName,
+          });
+        }
+
+        const displayName = profile?.full_name || fallbackName;
+
+        return {
+          id: sbUser.id,
+          uid: sbUser.id,
+          email,
+          displayName,
+          name: displayName,
+          phoneNumber: profile?.phone || sbUser.phone || null,
+          role: "user",
+          createdAt: sbUser.created_at,
+        };
+      } catch (err) {
+        console.error("[AuthContext] Profile sync error:", err);
+        const email = sbUser.email || "";
+        const displayName =
+          (sbUser.user_metadata?.full_name as string | undefined) ||
+          (email ? email.split("@")[0] : "User");
+        return {
+          id: sbUser.id,
+          uid: sbUser.id,
+          email,
+          displayName,
+          name: displayName,
+          phoneNumber: sbUser.phone || null,
+          role: "user",
+          createdAt: sbUser.created_at,
+        };
+      }
+    },
+    [supabase]
+  );
+
+  // Initialize session and listen for auth state updates
+  useEffect(() => {
+    let mounted = true;
+
+    async function initAuth() {
+      try {
+        const {
+          data: { session: initialSession },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error) {
+          console.warn("[AuthContext] Initial session check warning:", error.message);
+        }
+
+        if (mounted) {
+          setSession(initialSession);
+          setSupabaseUser(initialSession?.user ?? null);
+          if (initialSession?.user) {
+            const profile = await syncUserProfile(initialSession.user);
+            if (mounted) setUser(profile);
+          }
+        }
+      } catch (err) {
+        console.error("[AuthContext] Init auth error:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
     }
-  } else if (memoryUser) {
-    user = memoryUser;
-  }
 
-  const openAuth = useCallback((mode: "signin" | "signup" = "signin") => {
-    setAuthMode(mode);
+    initAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+      if (!mounted) return;
+      setSession(currentSession);
+      setSupabaseUser(currentSession?.user ?? null);
+
+      if (currentSession?.user) {
+        const profile = await syncUserProfile(currentSession.user);
+        if (mounted) {
+          setUser(profile);
+          setIsAuthOpen(false);
+        }
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [supabase, syncUserProfile]);
+
+  const openAuth = useCallback((mode?: string) => {
+    void mode;
     setIsAuthOpen(true);
   }, []);
 
@@ -79,67 +172,148 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthOpen(false);
   }, []);
 
-  const signIn = useCallback((email: string) => {
-    const trimmedEmail = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      return { success: false, error: "Please enter a valid email address." };
-    }
-    const derivedName = trimmedEmail
-      .split("@")[0]
-      .replace(/[._-]+/g, " ")
-      .replace(/\b\w/g, (ch) => ch.toUpperCase());
-
-    const newUser: User = { name: derivedName, email: trimmedEmail };
-    memoryUser = newUser;
+  /**
+   * Initiates Google OAuth authentication via Supabase Auth
+   */
+  const signInWithGoogle = useCallback(async () => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
-    } catch {}
-    notify();
-    setIsAuthOpen(false);
-    return { success: true };
-  }, []);
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${origin}/auth/callback`,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+        },
+      });
 
-  const signUp = useCallback((name: string, email: string) => {
-    const trimmedName = name.trim();
-    const trimmedEmail = email.trim();
+      if (error) {
+        return { error: error.message };
+      }
 
-    if (trimmedName.length < 2) {
-      return { success: false, error: "Please enter your full name." };
+      return {};
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Failed to initiate Google login.";
+      return { error: msg };
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      return { success: false, error: "Please enter a valid email address." };
+  }, [supabase]);
+
+  /**
+   * Dispatches a real 6-digit OTP code to the provided email address via Supabase Auth
+   */
+  const signInWithOtp = useCallback(
+    async (email: string) => {
+      try {
+        const cleanEmail = email.trim().toLowerCase();
+        const { error } = await supabase.auth.signInWithOtp({
+          email: cleanEmail,
+          options: {
+            shouldCreateUser: true,
+          },
+        });
+
+        if (error) {
+          return { success: false, error: error.message };
+        }
+
+        return { success: true };
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "An unexpected error occurred while sending OTP.";
+        return { success: false, error: msg };
+      }
+    },
+    [supabase]
+  );
+
+  /**
+   * Verifies the 6-digit OTP token and establishes an authenticated Supabase session
+   */
+  const verifyOtp = useCallback(
+    async (email: string, token: string) => {
+      try {
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanToken = token.trim();
+
+        const { data, error } = await supabase.auth.verifyOtp({
+          email: cleanEmail,
+          token: cleanToken,
+          type: "email",
+        });
+
+        if (error) {
+          return { success: false, error: error.message };
+        }
+
+        if (data.session && data.user) {
+          setSession(data.session);
+          setSupabaseUser(data.user);
+          const profile = await syncUserProfile(data.user);
+          setUser(profile);
+          setIsAuthOpen(false);
+        }
+
+        return { success: true };
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "An unexpected error occurred during OTP verification.";
+        return { success: false, error: msg };
+      }
+    },
+    [supabase, syncUserProfile]
+  );
+
+  /**
+   * Signs out of Supabase and clears local user/session state
+   */
+  const signOut = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+      await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    } catch (err) {
+      console.error("[AuthContext] Sign out error:", err);
+    } finally {
+      setUser(null);
+      setSupabaseUser(null);
+      setSession(null);
     }
+  }, [supabase]);
 
-    const newUser: User = { name: trimmedName, email: trimmedEmail };
-    memoryUser = newUser;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
-    } catch {}
-    notify();
-    setIsAuthOpen(false);
-    return { success: true };
-  }, []);
-
-  const signOut = useCallback(() => {
-    memoryUser = null;
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
-    notify();
-  }, []);
+  /**
+   * Returns current access token for authenticated API requests
+   */
+  const getIdToken = useCallback(async () => {
+    if (!session) {
+      const { data } = await supabase.auth.getSession();
+      return data.session?.access_token || null;
+    }
+    return session.access_token || null;
+  }, [session, supabase]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        supabaseUser,
+        session,
+        loading,
         isAuthOpen,
-        authMode,
         openAuth,
         closeAuth,
-        setAuthMode,
-        signIn,
-        signUp,
+        signInWithGoogle,
+        signInWithOtp,
+        verifyOtp,
         signOut,
+        getIdToken,
       }}
     >
       {children}

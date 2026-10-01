@@ -178,10 +178,29 @@ export default function Footer() {
         </div>
 
         <div
-          className="mt-8 flex flex-col items-center gap-3 border-t pt-6 text-center text-xs sm:flex-row sm:items-center sm:justify-between sm:text-left"
+          className="mt-8 flex flex-col items-center gap-4 border-t pt-6 text-center text-xs sm:flex-row sm:items-center sm:justify-between sm:text-left"
           style={{ borderColor: "var(--line)", color: "var(--fg-soft)" }}
         >
-          <p>© 2026 Nikunj Giri · Goswami X Software. All rights reserved.</p>
+          <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-5">
+            <p>© 2026 Nikunj Giri · Goswami X Software. All rights reserved.</p>
+            <div className="flex items-center gap-3 text-[11px]">
+              <a
+                href="/privacy-policy"
+                className="transition-colors hover:opacity-100"
+                style={{ color: "var(--fg-soft)" }}
+              >
+                Privacy Policy
+              </a>
+              <span style={{ color: "var(--line)" }}>•</span>
+              <a
+                href="/terms"
+                className="transition-colors hover:opacity-100"
+                style={{ color: "var(--fg-soft)" }}
+              >
+                Terms of Service
+              </a>
+            </div>
+          </div>
           <button
             id="toTopInline"
             type="button"

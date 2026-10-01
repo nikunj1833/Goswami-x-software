@@ -8,23 +8,72 @@ export default function ContactForm() {
   const [nameInput, setNameInput] = useState<string | null>(null);
   const [emailInput, setEmailInput] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [phone, setPhone] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const name = nameInput !== null ? nameInput : user?.name || "";
   const email = emailInput !== null ? emailInput : user?.email || "";
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFeedback(null);
+
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
     const trimmedMsg = message.trim();
+    const trimmedPhone = phone.trim() || user?.phoneNumber || undefined;
 
-    const subject = encodeURIComponent("Project inquiry from " + trimmedName);
-    const body = encodeURIComponent(
-      trimmedMsg + "\n\n— " + trimmedName + " (" + trimmedEmail + ")"
-    );
+    if (!trimmedName) {
+      setFeedback({ type: "error", text: "Please provide your name." });
+      return;
+    }
 
-    window.location.href =
-      "mailto:your-email@example.com?subject=" + subject + "&body=" + body;
+    if (!trimmedEmail) {
+      setFeedback({ type: "error", text: "Please provide a valid email address." });
+      return;
+    }
+
+    if (!trimmedMsg || trimmedMsg.length < 10) {
+      setFeedback({ type: "error", text: "Please enter a message of at least 10 characters." });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: trimmedName,
+          email: trimmedEmail,
+          message: trimmedMsg,
+          phoneNumber: trimmedPhone,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setFeedback({
+          type: "error",
+          text: data.error || "Failed to submit inquiry. Please try again.",
+        });
+      } else {
+        setFeedback({
+          type: "success",
+          text: data.message || "Thank you for reaching out! Your message has been sent successfully.",
+        });
+        setMessage("");
+      }
+    } catch {
+      setFeedback({
+        type: "error",
+        text: "Network error. Please check your connection and try again.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -50,6 +99,7 @@ export default function ContactForm() {
             placeholder="Your name"
             value={name}
             onChange={(e) => setNameInput(e.target.value)}
+            disabled={submitting}
             className="field w-full rounded-lg px-4 py-3 text-sm outline-none"
           />
         </div>
@@ -70,6 +120,27 @@ export default function ContactForm() {
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmailInput(e.target.value)}
+            disabled={submitting}
+            className="field w-full rounded-lg px-4 py-3 text-sm outline-none"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="cf-phone"
+            className="mb-1.5 block text-xs font-mono"
+            style={{ color: "var(--fg-soft)" }}
+          >
+            Phone / WhatsApp <span className="text-[11px] opacity-70">(optional)</span>
+          </label>
+          <input
+            id="cf-phone"
+            name="phone"
+            type="tel"
+            placeholder="+91 98765 43210"
+            value={phone || user?.phoneNumber || ""}
+            onChange={(e) => setPhone(e.target.value)}
+            disabled={submitting}
             className="field w-full rounded-lg px-4 py-3 text-sm outline-none"
           />
         </div>
@@ -90,20 +161,34 @@ export default function ContactForm() {
             placeholder="Tell me about your project"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            disabled={submitting}
             className="field w-full resize-none rounded-lg px-4 py-3 text-sm outline-none"
           />
         </div>
 
+        {feedback && (
+          <p
+            id="cf-feedback"
+            className="text-xs"
+            style={{ color: feedback.type === "success" ? "#4ADE80" : "#E2694A" }}
+            role={feedback.type === "error" ? "alert" : "status"}
+          >
+            {feedback.text}
+          </p>
+        )}
+
         <button
+          id="cf-submit"
           type="submit"
-          className="btn-primary w-full rounded-full px-6 py-3 text-sm font-medium"
+          disabled={submitting}
+          className="btn-primary w-full rounded-full px-6 py-3 text-sm font-medium cursor-pointer transition-opacity disabled:opacity-50"
           style={{ color: "var(--bg)" }}
         >
-          Send message
+          {submitting ? "Sending message..." : "Send message"}
         </button>
 
         <p id="cf-note" className="text-center text-xs" style={{ color: "var(--fg-soft)" }}>
-          Opens your email app with this message pre-filled.
+          Direct communication with Nikunj Giri. Responses within 24 hours.
         </p>
       </div>
     </form>

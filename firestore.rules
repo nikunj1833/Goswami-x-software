@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.role == 'admin' || 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    // USERS COLLECTION:
+    // - Authenticated users can read their own user profile document.
+    // - Admins can read user profiles.
+    // - Users can update only non-critical profile fields (displayName, email, photoURL).
+    // - Users CANNOT modify: uid, phoneNumber, phoneNumberNormalized, role, status, authProvider, createdAt.
+    // - Users CANNOT elevate themselves to admin.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      
+      allow create: if false; // User creation must occur through trusted server logic (Cloud Functions / Admin SDK)
+
+      allow update: if isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName', 
+          'email', 
+          'photoURL', 
+          'updatedAt'
+        ])
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.authProvider == resource.data.authProvider;
+
+      allow delete: if isAdmin();
+    }
+
+    // AUTH CHALLENGES (OTPs):
+    // Strictly confidential server-side collection. Never accessible by client SDKs.
+    match /authChallenges/{challengeId} {
+      allow read, write: if false;
+    }
+
+    // CONTACT SUBMISSIONS:
+    // Submissions are processed and rate-limited via server APIs / Cloud Functions.
+    // Only admins can read contact inquiries.
+    match /contactSubmissions/{submissionId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // WHATSAPP EVENTS & WEBHOOK AUDIT LOG:
+    // Strictly confidential server-side collection. Never accessible by client SDKs.
+    match /whatsappEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    // RATE LIMITS:
+    // Strictly confidential server-side collection. Never accessible by client SDKs.
+    match /rateLimits/{rateLimitId} {
+      allow read, write: if false;
+    }
+
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
