@@ -6,12 +6,21 @@ export async function updateSession(request: NextRequest) {
     request,
   });
 
+  // Skip auth session refresh on OAuth callback itself to prevent request contention
+  if (request.nextUrl.pathname.startsWith("/auth/callback")) {
+    return supabaseResponse;
+  }
+
   const url =
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
     "https://pjjtytivwvmetapbysvq.supabase.co";
   const key =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     "sb_publishable_iXMtChaLg5sidNk8u6WwHQ_ZxunEk75";
+
+  const isSecure =
+    request.nextUrl.protocol === "https:" ||
+    process.env.NODE_ENV === "production";
 
   const supabase = createServerClient(url, key, {
     cookies: {
@@ -26,7 +35,12 @@ export async function updateSession(request: NextRequest) {
           request,
         });
         cookiesToSet.forEach(({ name, value, options }) =>
-          supabaseResponse.cookies.set(name, value, options)
+          supabaseResponse.cookies.set(name, value, {
+            ...options,
+            path: options?.path ?? "/",
+            sameSite: (options?.sameSite as "lax" | "strict" | "none") ?? "lax",
+            secure: isSecure,
+          })
         );
       },
     },

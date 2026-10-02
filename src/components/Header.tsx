@@ -69,6 +69,14 @@ export default function Header() {
     };
   }, []);
 
+  useEffect(() => {
+    console.log("[AuthTrace][Header Received User State]", {
+      hasUser: Boolean(user),
+      hasSupabaseUser: Boolean(supabaseUser),
+      avatarInitial: (user || supabaseUser) ? getAvatarInitial() : null,
+    });
+  }, [user, supabaseUser]);
+
   const handleAuthClick = () => {
     if (user || supabaseUser) {
       signOut();

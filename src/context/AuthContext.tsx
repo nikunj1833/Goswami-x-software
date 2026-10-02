@@ -122,6 +122,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             try {
               const { data: exchangeData, error: exchangeErr } =
                 await supabase.auth.exchangeCodeForSession(codeParam);
+
+              console.log("[AuthTrace][Client Code Exchange Result]", {
+                success: !exchangeErr && Boolean(exchangeData?.session),
+                hasSession: Boolean(exchangeData?.session),
+                hasUser: Boolean(exchangeData?.session?.user),
+                provider: exchangeData?.session?.user?.app_metadata?.provider ?? null,
+                hasEmail: Boolean(exchangeData?.session?.user?.email),
+                errorName: exchangeErr?.name,
+                errorMessage: exchangeErr?.message,
+              });
+
               if (!exchangeErr && exchangeData?.session) {
                 // Clean up ?code= from browser URL
                 const cleanUrl = new URL(window.location.href);
@@ -167,6 +178,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error,
         } = await supabase.auth.getSession();
 
+        console.log("[AuthTrace][Browser getSession Result]", {
+          hasSession: Boolean(initialSession),
+          hasUser: Boolean(initialSession?.user),
+          provider: initialSession?.user?.app_metadata?.provider ?? null,
+          hasEmail: Boolean(initialSession?.user?.email),
+          error: error?.message,
+        });
+
         if (error) {
           console.warn("[AuthContext] Initial session check warning:", error.message);
         }
@@ -209,6 +228,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!mounted) return;
 
+      console.log("[AuthTrace][onAuthStateChange Event]", {
+        event,
+        hasSession: Boolean(currentSession),
+        hasUser: Boolean(currentSession?.user),
+        provider: currentSession?.user?.app_metadata?.provider ?? null,
+        hasEmail: Boolean(currentSession?.user?.email),
+      });
+
       if (event === "SIGNED_OUT") {
         setSession(null);
         setSupabaseUser(null);
@@ -227,7 +254,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           (email ? email.split("@")[0] : "User");
 
         // Immediate user profile update to avoid any render delay
-        setUser((prev) => prev ?? {
+        setUser({
           id: currentSession.user.id,
           uid: currentSession.user.id,
           email,
@@ -239,16 +266,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         setIsAuthOpen(false);
 
-        const profile = await syncUserProfile(currentSession.user);
-        if (mounted && profile) {
-          setUser(profile);
-        }
+        void syncUserProfile(currentSession.user).then((profile) => {
+          if (mounted && profile) {
+            setUser(profile);
+          }
+        });
       } else if (event === "INITIAL_SESSION") {
         // Do not prematurely wipe user state during INITIAL_SESSION verification
-      } else if (!currentSession) {
-        setSession(null);
-        setSupabaseUser(null);
-        setUser(null);
       }
     });
 
@@ -257,6 +281,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, [supabase, syncUserProfile]);
+
+  useEffect(() => {
+    console.log("[AuthTrace][AuthContext Final User State]", {
+      hasUser: Boolean(user),
+      hasSupabaseUser: Boolean(supabaseUser),
+      hasSession: Boolean(session),
+      loading,
+      userInitial: user?.name ? user.name.charAt(0) : null,
+      emailInitial: user?.email ? user.email.charAt(0) : null,
+    });
+  }, [user, supabaseUser, session, loading]);
 
   const openAuth = useCallback((mode?: string) => {
     void mode;

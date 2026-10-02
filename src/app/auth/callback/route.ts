@@ -34,6 +34,17 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const cookieStore = await cookies();
+    const isSecure =
+      redirectOrigin.startsWith("https://") ||
+      process.env.NODE_ENV === "production";
+
+    console.log("[AuthTrace][OAuth Callback Reached]", {
+      hasCode: Boolean(code),
+      hasError: Boolean(errorParam),
+      targetUrl,
+      isSecure,
+    });
+
     const response = NextResponse.redirect(targetUrl);
     response.headers.set("Cache-Control", "no-store, max-age=0");
 
@@ -47,21 +58,45 @@ export async function GET(request: NextRequest) {
     const supabase = createServerClient(url, key, {
       cookies: {
         getAll() {
-          const fromReq = request.cookies.getAll();
-          return fromReq && fromReq.length > 0 ? fromReq : cookieStore.getAll();
+          const reqCookies = request.cookies.getAll();
+          const storeCookies = cookieStore.getAll();
+          const map = new Map<string, { name: string; value: string }>();
+          for (const c of storeCookies) {
+            map.set(c.name, c);
+          }
+          for (const c of reqCookies) {
+            map.set(c.name, c);
+          }
+          return Array.from(map.values());
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
+            const normalizedOptions = {
+              ...options,
+              path: options?.path ?? "/",
+              sameSite: (options?.sameSite as "lax" | "strict" | "none") ?? "lax",
+              secure: isSecure,
+            };
             try {
-              cookieStore.set(name, value, options);
+              cookieStore.set(name, value, normalizedOptions);
             } catch {}
-            response.cookies.set(name, value, options);
+            response.cookies.set(name, value, normalizedOptions);
           });
         },
       },
     });
 
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    console.log("[AuthTrace][Code Exchange Result]", {
+      success: !error && Boolean(data?.session),
+      hasSession: Boolean(data?.session),
+      hasUser: Boolean(data?.session?.user),
+      provider: data?.session?.user?.app_metadata?.provider ?? null,
+      hasEmail: Boolean(data?.session?.user?.email),
+      errorName: error?.name,
+      errorMessage: error?.message,
+    });
 
     if (!error && data?.session) {
       return response;
