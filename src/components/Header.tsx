@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function Header() {
   const headerRef = useRef<HTMLElement | null>(null);
-  const { user, supabaseUser, openAuth, signOut } = useAuth();
+  const { user, supabaseUser, authError, clearAuthError, openAuth, signOut } = useAuth();
 
   const getAvatarInitial = (): string => {
     // 1. Try profile/user full name or display name
@@ -74,6 +74,7 @@ export default function Header() {
       hasUser: Boolean(user),
       hasSupabaseUser: Boolean(supabaseUser),
       avatarInitial: (user || supabaseUser) ? getAvatarInitial() : null,
+      email: user?.email || supabaseUser?.email || null,
     });
   }, [user, supabaseUser]);
 
@@ -85,14 +86,17 @@ export default function Header() {
     }
   };
 
+  const userEmail = user?.email || supabaseUser?.email;
+  const userName = user?.name || (supabaseUser?.user_metadata?.full_name as string) || userEmail || "User";
+
   return (
     <header
       ref={headerRef}
-      className="fixed top-0 left-0 right-0 z-30 border-b backdrop-blur-md"
+      className="fixed top-0 left-0 right-0 z-30 border-b backdrop-blur-md transition-all"
       style={{
         paddingTop: "env(safe-area-inset-top, 0px)",
         borderColor: "var(--line)",
-        backgroundColor: "color-mix(in srgb, var(--bg) 80%, transparent)",
+        backgroundColor: "color-mix(in srgb, var(--bg) 85%, transparent)",
       }}
     >
       <nav
@@ -169,21 +173,33 @@ export default function Header() {
 
         <div className="flex items-center gap-2 sm:gap-4">
           {user || supabaseUser ? (
-            <button
-              id="authAvatarBtn"
-              type="button"
-              className="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full font-serif font-semibold text-sm transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
-              style={{
-                background: "linear-gradient(135deg, var(--accent-soft), var(--accent))",
-                color: "var(--bg)",
-                border: "1.5px solid var(--line)",
-              }}
-              onClick={handleAuthClick}
-              aria-label={`Signed in as ${user?.name || (supabaseUser?.user_metadata?.full_name as string) || user?.email || supabaseUser?.email || "User"}. Click to sign out.`}
-              title={`${user?.name || (supabaseUser?.user_metadata?.full_name as string) || user?.email || supabaseUser?.email || "User"} · click to sign out`}
-            >
-              <span>{getAvatarInitial()}</span>
-            </button>
+            <div className="flex items-center gap-2.5">
+              <button
+                id="authAvatarBtn"
+                type="button"
+                className="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full font-serif font-semibold text-sm transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+                style={{
+                  background: "linear-gradient(135deg, var(--accent-soft), var(--accent))",
+                  color: "var(--bg)",
+                  border: "1.5px solid var(--line)",
+                }}
+                onClick={handleAuthClick}
+                aria-label={`Signed in as ${userName} (${userEmail}). Click to sign out.`}
+                title={`${userName} (${userEmail}) · click to sign out`}
+              >
+                <span>{getAvatarInitial()}</span>
+              </button>
+              {userEmail && (
+                <span
+                  id="userEmailDisplay"
+                  className="hidden xl:inline text-xs font-mono max-w-[170px] truncate select-none opacity-80"
+                  style={{ color: "var(--fg-soft)" }}
+                  title={`${userName} (${userEmail})`}
+                >
+                  {userEmail}
+                </span>
+              )}
+            </div>
           ) : (
             <button
               id="authBtn"
@@ -208,6 +224,34 @@ export default function Header() {
           </a>
         </div>
       </nav>
+
+      {/* Visible alert banner if OAuth provider or callback returns an error */}
+      {authError && (
+        <div
+          role="alert"
+          className="mx-auto my-2 flex max-w-[72rem] items-center justify-between gap-3 rounded-2xl border px-4 py-2.5 text-xs sm:text-sm shadow-md"
+          style={{
+            borderColor: "rgba(226, 105, 74, 0.4)",
+            backgroundColor: "rgba(35, 15, 12, 0.95)",
+            color: "#FFAAA0",
+          }}
+        >
+          <div className="flex items-center gap-2 truncate">
+            <span className="text-base select-none">⚠️</span>
+            <span className="truncate">
+              <strong>Google Auth Notice:</strong> {authError}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={clearAuthError}
+            className="shrink-0 rounded-full px-2.5 py-0.5 text-xs border transition-colors hover:bg-white/10 cursor-pointer"
+            style={{ borderColor: "rgba(226, 105, 74, 0.4)" }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
     </header>
   );
 }

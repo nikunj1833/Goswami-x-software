@@ -29,7 +29,12 @@ export async function GET(request: NextRequest) {
   // Handle OAuth provider error (e.g., user canceled flow)
   if (errorParam) {
     console.error("[auth/callback] OAuth provider error:", errorParam, errorDescription);
-    return NextResponse.redirect(`${redirectOrigin}/?error=${encodeURIComponent(errorParam)}`);
+    const redirectUrl = new URL(redirectOrigin);
+    redirectUrl.searchParams.set("error", errorParam);
+    if (errorDescription) {
+      redirectUrl.searchParams.set("error_description", errorDescription);
+    }
+    return NextResponse.redirect(redirectUrl.toString());
   }
 
   if (code) {
@@ -103,15 +108,45 @@ export async function GET(request: NextRequest) {
     }
 
     console.warn("[auth/callback] Server code exchange warning:", error?.message);
-    // If server code exchange encounters an issue (e.g. PKCE cookie partition),
-    // redirect with code to allow the browser client (which holds the verifier) to complete exchange
-    const clientExchangeUrl = new URL(safeNext, redirectOrigin);
-    clientExchangeUrl.searchParams.set("code", code);
-    return NextResponse.redirect(clientExchangeUrl.toString());
+    const errRedirect = new URL(safeNext, redirectOrigin);
+    errRedirect.searchParams.set("error", "exchange_failed");
+    if (error?.message) {
+      errRedirect.searchParams.set("error_description", error.message);
+    }
+    return NextResponse.redirect(errRedirect.toString());
   }
 
-  // If no code and no error, redirect to home
-  return NextResponse.redirect(`${redirectOrigin}/?error=no_code`);
+  // If no code and no error in query params:
+  // Supabase may pass errors in the hash fragment (e.g. #error=server_error&error_description=...)
+  // Return lightweight script to forward hash parameters to query params on redirect
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Authenticating...</title></head>
+<body>
+<script>
+  (function() {
+    var hash = window.location.hash || "";
+    if (hash.includes("error")) {
+      var hp = new URLSearchParams(hash.replace(/^#/, ""));
+      var err = hp.get("error") || "oauth_error";
+      var desc = hp.get("error_description") || hp.get("error_code") || "";
+      var target = new URL("${redirectOrigin}");
+      target.searchParams.set("error", err);
+      if (desc) target.searchParams.set("error_description", desc);
+      window.location.replace(target.toString());
+    } else {
+      window.location.replace("${redirectOrigin}/?error=no_code");
+    }
+  })();
+</script>
+</body>
+</html>`;
+  return new NextResponse(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store, max-age=0",
+    },
+  });
 }
 
 

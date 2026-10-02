@@ -28,6 +28,8 @@ export interface AuthContextType {
   supabaseUser: SupabaseUser | null;
   session: Session | null;
   loading: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
   isAuthOpen: boolean;
   openAuth: (mode?: string) => void;
   closeAuth: () => void;
@@ -47,7 +49,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+
+  const clearAuthError = useCallback(() => setAuthError(null), []);
 
   // Sync Supabase user with public.profiles record
   const syncUserProfile = useCallback(
@@ -114,10 +119,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function initAuth() {
       try {
-        // 1. Direct client-side code exchange if redirected with code
+        // 1. Direct client-side code exchange if redirected with code or error handling
         if (typeof window !== "undefined") {
           const params = new URLSearchParams(window.location.search);
           const codeParam = params.get("code");
+          const errorParam = params.get("error");
+          const errorDesc = params.get("error_description");
+
+          let detectedError: string | null = null;
+          if (errorParam) {
+            detectedError = errorDesc ? `${errorParam}: ${errorDesc}` : errorParam;
+          } else if (window.location.hash && window.location.hash.includes("error")) {
+            const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+            const hashErr = hashParams.get("error");
+            const hashDesc = hashParams.get("error_description");
+            if (hashErr) {
+              detectedError = hashDesc ? `${hashErr}: ${hashDesc}` : hashErr;
+            }
+          }
+
+          if (detectedError && mounted) {
+            console.error("[AuthContext] OAuth error detected from redirect:", detectedError);
+            setAuthError(detectedError);
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete("error");
+            cleanUrl.searchParams.delete("error_description");
+            cleanUrl.searchParams.delete("error_code");
+            if (cleanUrl.hash.includes("error")) {
+              cleanUrl.hash = "";
+            }
+            window.history.replaceState({}, document.title, cleanUrl.toString());
+          }
+
           if (codeParam) {
             try {
               const { data: exchangeData, error: exchangeErr } =
@@ -138,6 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const cleanUrl = new URL(window.location.href);
                 cleanUrl.searchParams.delete("code");
                 cleanUrl.searchParams.delete("error");
+                cleanUrl.searchParams.delete("error_description");
                 window.history.replaceState({}, document.title, cleanUrl.toString());
 
                 if (mounted) {
@@ -165,6 +199,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   });
                   return;
                 }
+              } else if (exchangeErr && mounted) {
+                setAuthError(exchangeErr.message);
               }
             } catch (err) {
               console.warn("[AuthContext] Client code exchange notice:", err);
@@ -307,6 +343,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const signInWithGoogle = useCallback(async () => {
     try {
+      setAuthError(null);
       const callbackUrl = getAuthCallbackUrl();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -320,6 +357,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
+        setAuthError(error.message);
         return { error: error.message };
       }
 
@@ -329,6 +367,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         err instanceof Error
           ? err.message
           : "Failed to initiate Google login.";
+      setAuthError(msg);
       return { error: msg };
     }
   }, [supabase]);
@@ -436,6 +475,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         supabaseUser,
         session,
         loading,
+        authError,
+        clearAuthError,
         isAuthOpen,
         openAuth,
         closeAuth,
