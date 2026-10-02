@@ -52,8 +52,11 @@ export async function authenticateServerRequest(
       if (token) {
         try {
           const directClient = createApiClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+            process.env.NEXT_PUBLIC_SUPABASE_URL ||
+              "https://pjjtytivwvmetapbysvq.supabase.co",
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+              process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+              "sb_publishable_iXMtChaLg5sidNk8u6WwHQ_ZxunEk75"
           );
           const { data, error } = await directClient.auth.getUser(token);
           if (!error && data?.user) {

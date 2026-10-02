@@ -12,9 +12,10 @@ export async function GET(request: NextRequest) {
 
   const forwardedHost = request.headers.get("x-forwarded-host");
   const forwardedProto = request.headers.get("x-forwarded-proto") || "https";
+  const host = request.headers.get("host") || "";
   const isLocalEnv =
     process.env.NODE_ENV === "development" &&
-    (origin.includes("localhost") || origin.includes("127.0.0.1"));
+    (origin.includes("localhost") || origin.includes("127.0.0.1") || host.includes("localhost"));
 
   const redirectOrigin = isLocalEnv
     ? origin
@@ -26,15 +27,18 @@ export async function GET(request: NextRequest) {
   const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/";
   const targetUrl = new URL(safeNext, redirectOrigin).toString();
 
-  // Handle OAuth provider error (e.g., user canceled flow)
+  // Handle OAuth provider error (e.g., user canceled flow or access_denied)
   if (errorParam) {
-    console.error("[auth/callback] OAuth provider error:", errorParam, errorDescription);
-    const redirectUrl = new URL(redirectOrigin);
-    redirectUrl.searchParams.set("error", errorParam);
+    console.error("[OAuth Callback Provider Error]", {
+      error: errorParam,
+      description: errorDescription,
+    });
+    const errRedirect = new URL(safeNext, redirectOrigin);
+    errRedirect.searchParams.set("error", errorParam);
     if (errorDescription) {
-      redirectUrl.searchParams.set("error_description", errorDescription);
+      errRedirect.searchParams.set("error_description", errorDescription);
     }
-    return NextResponse.redirect(redirectUrl.toString());
+    return NextResponse.redirect(errRedirect.toString());
   }
 
   if (code) {
@@ -57,22 +61,14 @@ export async function GET(request: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_URL ||
       "https://pjjtytivwvmetapbysvq.supabase.co";
     const key =
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
       "sb_publishable_iXMtChaLg5sidNk8u6WwHQ_ZxunEk75";
 
     const supabase = createServerClient(url, key, {
       cookies: {
         getAll() {
-          const reqCookies = request.cookies.getAll();
-          const storeCookies = cookieStore.getAll();
-          const map = new Map<string, { name: string; value: string }>();
-          for (const c of storeCookies) {
-            map.set(c.name, c);
-          }
-          for (const c of reqCookies) {
-            map.set(c.name, c);
-          }
-          return Array.from(map.values());
+          return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
@@ -107,9 +103,12 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    console.warn("[auth/callback] Server code exchange warning:", error?.message);
+    console.error("[OAuth Callback Exchange Failed]", {
+      errorName: error?.name,
+      errorMessage: error?.message,
+    });
     const errRedirect = new URL(safeNext, redirectOrigin);
-    errRedirect.searchParams.set("error", "exchange_failed");
+    errRedirect.searchParams.set("error", error?.name || "exchange_failed");
     if (error?.message) {
       errRedirect.searchParams.set("error_description", error.message);
     }
@@ -117,7 +116,7 @@ export async function GET(request: NextRequest) {
   }
 
   // If no code and no error in query params:
-  // Supabase may pass errors in the hash fragment (e.g. #error=server_error&error_description=...)
+  // Supabase may pass errors in hash fragment (e.g. #error=server_error&error_description=...)
   // Return lightweight script to forward hash parameters to query params on redirect
   const html = `<!DOCTYPE html>
 <html>
@@ -148,5 +147,3 @@ export async function GET(request: NextRequest) {
     },
   });
 }
-
-

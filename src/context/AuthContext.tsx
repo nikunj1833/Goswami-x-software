@@ -42,6 +42,29 @@ export interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function buildUserProfile(
+  sbUser: SupabaseUser,
+  profile?: { full_name?: string | null; phone?: string | null } | null
+): UserProfile {
+  const email = sbUser.email || "";
+  const rawName =
+    profile?.full_name ||
+    (sbUser.user_metadata?.full_name as string | undefined) ||
+    (sbUser.user_metadata?.name as string | undefined) ||
+    (email ? email.split("@")[0] : "User");
+
+  return {
+    id: sbUser.id,
+    uid: sbUser.id,
+    email,
+    displayName: rawName,
+    name: rawName,
+    phoneNumber: profile?.phone || sbUser.phone || null,
+    role: "user",
+    createdAt: sbUser.created_at,
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
 
@@ -66,149 +89,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .eq("id", sbUser.id)
           .maybeSingle();
 
-        const email = sbUser.email || "";
-        const fallbackName =
-          (sbUser.user_metadata?.full_name as string | undefined) ||
-          (sbUser.user_metadata?.name as string | undefined) ||
-          (email ? email.split("@")[0] : "User");
+        const baseProfile = buildUserProfile(sbUser, profile);
 
         if (!profile) {
-          // Create profile record if not present, adhering to RLS (id = auth.uid())
-          await supabase.from("profiles").insert({
-            id: sbUser.id,
-            full_name: fallbackName,
-          });
+          try {
+            await supabase.from("profiles").insert({
+              id: sbUser.id,
+              full_name: baseProfile.name,
+            });
+          } catch {}
         }
 
-        const displayName = profile?.full_name || fallbackName;
-
-        return {
-          id: sbUser.id,
-          uid: sbUser.id,
-          email,
-          displayName,
-          name: displayName,
-          phoneNumber: profile?.phone || sbUser.phone || null,
-          role: "user",
-          createdAt: sbUser.created_at,
-        };
+        return baseProfile;
       } catch (err) {
-        console.error("[AuthContext] Profile sync error:", err);
-        const email = sbUser.email || "";
-        const displayName =
-          (sbUser.user_metadata?.full_name as string | undefined) ||
-          (email ? email.split("@")[0] : "User");
-        return {
-          id: sbUser.id,
-          uid: sbUser.id,
-          email,
-          displayName,
-          name: displayName,
-          phoneNumber: sbUser.phone || null,
-          role: "user",
-          createdAt: sbUser.created_at,
-        };
+        console.warn("[AuthContext] Profile sync notice:", err);
+        return buildUserProfile(sbUser);
       }
     },
     [supabase]
   );
 
-  // Initialize session and listen for auth state updates
+  // Initialize session and subscribe to auth changes
   useEffect(() => {
     let mounted = true;
 
+    // Detect OAuth errors passed in URL
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const errorParam = params.get("error");
+      const errorDesc = params.get("error_description");
+
+      let detectedError: string | null = null;
+      if (errorParam) {
+        detectedError = errorDesc ? `${errorParam}: ${errorDesc}` : errorParam;
+      } else if (window.location.hash && window.location.hash.includes("error")) {
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const hashErr = hashParams.get("error");
+        const hashDesc = hashParams.get("error_description");
+        if (hashErr) {
+          detectedError = hashDesc ? `${hashErr}: ${hashDesc}` : hashErr;
+        }
+      }
+
+      if (detectedError && mounted) {
+        console.error("[AuthContext] OAuth error detected from URL:", detectedError);
+        setAuthError(detectedError);
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete("error");
+        cleanUrl.searchParams.delete("error_description");
+        cleanUrl.searchParams.delete("error_code");
+        if (cleanUrl.hash.includes("error")) {
+          cleanUrl.hash = "";
+        }
+        window.history.replaceState({}, document.title, cleanUrl.toString());
+      }
+    }
+
+    // 1. Initial session fetch
     async function initAuth() {
       try {
-        // 1. Direct client-side code exchange if redirected with code or error handling
-        if (typeof window !== "undefined") {
-          const params = new URLSearchParams(window.location.search);
-          const codeParam = params.get("code");
-          const errorParam = params.get("error");
-          const errorDesc = params.get("error_description");
-
-          let detectedError: string | null = null;
-          if (errorParam) {
-            detectedError = errorDesc ? `${errorParam}: ${errorDesc}` : errorParam;
-          } else if (window.location.hash && window.location.hash.includes("error")) {
-            const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-            const hashErr = hashParams.get("error");
-            const hashDesc = hashParams.get("error_description");
-            if (hashErr) {
-              detectedError = hashDesc ? `${hashErr}: ${hashDesc}` : hashErr;
-            }
-          }
-
-          if (detectedError && mounted) {
-            console.error("[AuthContext] OAuth error detected from redirect:", detectedError);
-            setAuthError(detectedError);
-            const cleanUrl = new URL(window.location.href);
-            cleanUrl.searchParams.delete("error");
-            cleanUrl.searchParams.delete("error_description");
-            cleanUrl.searchParams.delete("error_code");
-            if (cleanUrl.hash.includes("error")) {
-              cleanUrl.hash = "";
-            }
-            window.history.replaceState({}, document.title, cleanUrl.toString());
-          }
-
-          if (codeParam) {
-            try {
-              const { data: exchangeData, error: exchangeErr } =
-                await supabase.auth.exchangeCodeForSession(codeParam);
-
-              console.log("[AuthTrace][Client Code Exchange Result]", {
-                success: !exchangeErr && Boolean(exchangeData?.session),
-                hasSession: Boolean(exchangeData?.session),
-                hasUser: Boolean(exchangeData?.session?.user),
-                provider: exchangeData?.session?.user?.app_metadata?.provider ?? null,
-                hasEmail: Boolean(exchangeData?.session?.user?.email),
-                errorName: exchangeErr?.name,
-                errorMessage: exchangeErr?.message,
-              });
-
-              if (!exchangeErr && exchangeData?.session) {
-                // Clean up ?code= from browser URL
-                const cleanUrl = new URL(window.location.href);
-                cleanUrl.searchParams.delete("code");
-                cleanUrl.searchParams.delete("error");
-                cleanUrl.searchParams.delete("error_description");
-                window.history.replaceState({}, document.title, cleanUrl.toString());
-
-                if (mounted) {
-                  setSession(exchangeData.session);
-                  setSupabaseUser(exchangeData.session.user);
-                  const email = exchangeData.session.user.email || "";
-                  const fallbackName =
-                    (exchangeData.session.user.user_metadata?.full_name as string | undefined) ||
-                    (exchangeData.session.user.user_metadata?.name as string | undefined) ||
-                    (email ? email.split("@")[0] : "User");
-
-                  setUser({
-                    id: exchangeData.session.user.id,
-                    uid: exchangeData.session.user.id,
-                    email,
-                    displayName: fallbackName,
-                    name: fallbackName,
-                    phoneNumber: exchangeData.session.user.phone || null,
-                    role: "user",
-                    createdAt: exchangeData.session.user.created_at,
-                  });
-
-                  void syncUserProfile(exchangeData.session.user).then((p) => {
-                    if (mounted && p) setUser(p);
-                  });
-                  return;
-                }
-              } else if (exchangeErr && mounted) {
-                setAuthError(exchangeErr.message);
-              }
-            } catch (err) {
-              console.warn("[AuthContext] Client code exchange notice:", err);
-            }
-          }
-        }
-
-        // 2. Standard getSession check
         const {
           data: { session: initialSession },
           error,
@@ -222,33 +161,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error: error?.message,
         });
 
-        if (error) {
-          console.warn("[AuthContext] Initial session check warning:", error.message);
-        }
-
-        if (mounted && initialSession?.user) {
-          setSession(initialSession);
-          setSupabaseUser(initialSession.user);
-          const email = initialSession.user.email || "";
-          const fallbackName =
-            (initialSession.user.user_metadata?.full_name as string | undefined) ||
-            (initialSession.user.user_metadata?.name as string | undefined) ||
-            (email ? email.split("@")[0] : "User");
-
-          // Set immediate provisional profile so UI doesn't delay
-          setUser({
-            id: initialSession.user.id,
-            uid: initialSession.user.id,
-            email,
-            displayName: fallbackName,
-            name: fallbackName,
-            phoneNumber: initialSession.user.phone || null,
-            role: "user",
-            createdAt: initialSession.user.created_at,
-          });
-
-          const profile = await syncUserProfile(initialSession.user);
-          if (mounted && profile) setUser(profile);
+        if (mounted) {
+          if (initialSession?.user) {
+            setSession(initialSession);
+            setSupabaseUser(initialSession.user);
+            const profile = await syncUserProfile(initialSession.user);
+            if (mounted) setUser(profile);
+          } else {
+            setSession(null);
+            setSupabaseUser(null);
+            setUser(null);
+          }
         }
       } catch (err) {
         console.error("[AuthContext] Init auth error:", err);
@@ -259,6 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
 
+    // 2. Subscribe once to onAuthStateChange
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
@@ -279,36 +203,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      if (event === "INITIAL_SESSION") {
+        if (currentSession?.user) {
+          setSession(currentSession);
+          setSupabaseUser(currentSession.user);
+          const profile = await syncUserProfile(currentSession.user);
+          if (mounted) setUser(profile);
+        }
+        return;
+      }
+
       if (currentSession?.user) {
         setSession(currentSession);
         setSupabaseUser(currentSession.user);
-
-        const email = currentSession.user.email || "";
-        const fallbackName =
-          (currentSession.user.user_metadata?.full_name as string | undefined) ||
-          (currentSession.user.user_metadata?.name as string | undefined) ||
-          (email ? email.split("@")[0] : "User");
-
-        // Immediate user profile update to avoid any render delay
-        setUser({
-          id: currentSession.user.id,
-          uid: currentSession.user.id,
-          email,
-          displayName: fallbackName,
-          name: fallbackName,
-          phoneNumber: currentSession.user.phone || null,
-          role: "user",
-          createdAt: currentSession.user.created_at,
-        });
         setIsAuthOpen(false);
-
-        void syncUserProfile(currentSession.user).then((profile) => {
-          if (mounted && profile) {
-            setUser(profile);
-          }
-        });
-      } else if (event === "INITIAL_SESSION") {
-        // Do not prematurely wipe user state during INITIAL_SESSION verification
+        const profile = await syncUserProfile(currentSession.user);
+        if (mounted) setUser(profile);
       }
     });
 
