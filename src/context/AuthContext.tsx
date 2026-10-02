@@ -114,6 +114,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function initAuth() {
       try {
+        // 1. Direct client-side code exchange if redirected with code
+        if (typeof window !== "undefined") {
+          const params = new URLSearchParams(window.location.search);
+          const codeParam = params.get("code");
+          if (codeParam) {
+            try {
+              const { data: exchangeData, error: exchangeErr } =
+                await supabase.auth.exchangeCodeForSession(codeParam);
+              if (!exchangeErr && exchangeData?.session) {
+                // Clean up ?code= from browser URL
+                const cleanUrl = new URL(window.location.href);
+                cleanUrl.searchParams.delete("code");
+                cleanUrl.searchParams.delete("error");
+                window.history.replaceState({}, document.title, cleanUrl.toString());
+
+                if (mounted) {
+                  setSession(exchangeData.session);
+                  setSupabaseUser(exchangeData.session.user);
+                  const email = exchangeData.session.user.email || "";
+                  const fallbackName =
+                    (exchangeData.session.user.user_metadata?.full_name as string | undefined) ||
+                    (exchangeData.session.user.user_metadata?.name as string | undefined) ||
+                    (email ? email.split("@")[0] : "User");
+
+                  setUser({
+                    id: exchangeData.session.user.id,
+                    uid: exchangeData.session.user.id,
+                    email,
+                    displayName: fallbackName,
+                    name: fallbackName,
+                    phoneNumber: exchangeData.session.user.phone || null,
+                    role: "user",
+                    createdAt: exchangeData.session.user.created_at,
+                  });
+
+                  void syncUserProfile(exchangeData.session.user).then((p) => {
+                    if (mounted && p) setUser(p);
+                  });
+                  return;
+                }
+              }
+            } catch (err) {
+              console.warn("[AuthContext] Client code exchange notice:", err);
+            }
+          }
+        }
+
+        // 2. Standard getSession check
         const {
           data: { session: initialSession },
           error,
@@ -123,31 +171,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.warn("[AuthContext] Initial session check warning:", error.message);
         }
 
-        if (mounted) {
+        if (mounted && initialSession?.user) {
           setSession(initialSession);
-          setSupabaseUser(initialSession?.user ?? null);
-          if (initialSession?.user) {
-            const email = initialSession.user.email || "";
-            const fallbackName =
-              (initialSession.user.user_metadata?.full_name as string | undefined) ||
-              (initialSession.user.user_metadata?.name as string | undefined) ||
-              (email ? email.split("@")[0] : "User");
+          setSupabaseUser(initialSession.user);
+          const email = initialSession.user.email || "";
+          const fallbackName =
+            (initialSession.user.user_metadata?.full_name as string | undefined) ||
+            (initialSession.user.user_metadata?.name as string | undefined) ||
+            (email ? email.split("@")[0] : "User");
 
-            // Set immediate provisional profile so UI doesn't delay
-            setUser({
-              id: initialSession.user.id,
-              uid: initialSession.user.id,
-              email,
-              displayName: fallbackName,
-              name: fallbackName,
-              phoneNumber: initialSession.user.phone || null,
-              role: "user",
-              createdAt: initialSession.user.created_at,
-            });
+          // Set immediate provisional profile so UI doesn't delay
+          setUser({
+            id: initialSession.user.id,
+            uid: initialSession.user.id,
+            email,
+            displayName: fallbackName,
+            name: fallbackName,
+            phoneNumber: initialSession.user.phone || null,
+            role: "user",
+            createdAt: initialSession.user.created_at,
+          });
 
-            const profile = await syncUserProfile(initialSession.user);
-            if (mounted && profile) setUser(profile);
-          }
+          const profile = await syncUserProfile(initialSession.user);
+          if (mounted && profile) setUser(profile);
         }
       } catch (err) {
         console.error("[AuthContext] Init auth error:", err);
@@ -160,12 +206,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+    } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!mounted) return;
-      setSession(currentSession);
-      setSupabaseUser(currentSession?.user ?? null);
+
+      if (event === "SIGNED_OUT") {
+        setSession(null);
+        setSupabaseUser(null);
+        setUser(null);
+        return;
+      }
 
       if (currentSession?.user) {
+        setSession(currentSession);
+        setSupabaseUser(currentSession.user);
+
         const email = currentSession.user.email || "";
         const fallbackName =
           (currentSession.user.user_metadata?.full_name as string | undefined) ||
@@ -189,7 +243,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (mounted && profile) {
           setUser(profile);
         }
-      } else {
+      } else if (event === "INITIAL_SESSION") {
+        // Do not prematurely wipe user state during INITIAL_SESSION verification
+      } else if (!currentSession) {
+        setSession(null);
+        setSupabaseUser(null);
         setUser(null);
       }
     });

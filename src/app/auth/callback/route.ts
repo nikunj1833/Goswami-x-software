@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { getSiteUrl } from "@/lib/auth/url";
 
 export async function GET(request: NextRequest) {
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (code) {
-    // Construct the redirect response first so auth cookies can be written directly to it
+    const cookieStore = await cookies();
     const response = NextResponse.redirect(targetUrl);
     response.headers.set("Cache-Control", "no-store, max-age=0");
 
@@ -46,10 +47,14 @@ export async function GET(request: NextRequest) {
     const supabase = createServerClient(url, key, {
       cookies: {
         getAll() {
-          return request.cookies.getAll();
+          const fromReq = request.cookies.getAll();
+          return fromReq && fromReq.length > 0 ? fromReq : cookieStore.getAll();
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
+            try {
+              cookieStore.set(name, value, options);
+            } catch {}
             response.cookies.set(name, value, options);
           });
         },
@@ -62,11 +67,16 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    console.error("[auth/callback] Exchange code error:", error?.message);
-    return NextResponse.redirect(`${redirectOrigin}/?error=auth_exchange_failed`);
+    console.warn("[auth/callback] Server code exchange warning:", error?.message);
+    // If server code exchange encounters an issue (e.g. PKCE cookie partition),
+    // redirect with code to allow the browser client (which holds the verifier) to complete exchange
+    const clientExchangeUrl = new URL(safeNext, redirectOrigin);
+    clientExchangeUrl.searchParams.set("code", code);
+    return NextResponse.redirect(clientExchangeUrl.toString());
   }
 
   // If no code and no error, redirect to home
   return NextResponse.redirect(`${redirectOrigin}/?error=no_code`);
 }
+
 
