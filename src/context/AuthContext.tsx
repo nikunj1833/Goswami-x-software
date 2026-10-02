@@ -10,6 +10,7 @@ import React, {
 } from "react";
 import type { User as SupabaseUser, Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { getAuthCallbackUrl } from "@/lib/auth/url";
 
 export interface UserProfile {
   id: string;
@@ -213,11 +214,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const signInWithGoogle = useCallback(async () => {
     try {
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const callbackUrl = getAuthCallbackUrl();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${origin}/auth/callback`,
+          redirectTo: callbackUrl,
           queryParams: {
             access_type: "offline",
             prompt: "consent",

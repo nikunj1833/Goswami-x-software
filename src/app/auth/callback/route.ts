@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { getSiteUrl } from "@/lib/auth/url";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -10,12 +11,15 @@ export async function GET(request: NextRequest) {
 
   const forwardedHost = request.headers.get("x-forwarded-host");
   const forwardedProto = request.headers.get("x-forwarded-proto") || "https";
-  const isLocalEnv = process.env.NODE_ENV === "development";
+  const isLocalEnv =
+    process.env.NODE_ENV === "development" &&
+    (origin.includes("localhost") || origin.includes("127.0.0.1"));
+
   const redirectOrigin = isLocalEnv
     ? origin
-    : forwardedHost
+    : forwardedHost && !forwardedHost.includes("localhost")
     ? `${forwardedProto}://${forwardedHost}`
-    : origin;
+    : getSiteUrl();
 
   // Sanitize redirect target to prevent open-redirect vulnerabilities
   const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/";
