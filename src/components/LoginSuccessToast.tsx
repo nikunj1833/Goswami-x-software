@@ -4,54 +4,39 @@ import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 
 interface Coords {
-  right?: number;
-  left?: number;
+  right: number;
   top: number;
-  isDesktop: boolean;
 }
 
 function computePosition(): Coords {
   if (typeof window === "undefined") {
-    return { right: 320, top: 38, isDesktop: true };
+    return { right: 24, top: 76 };
   }
 
+  // Target the "Get in touch" button specifically
   const btn =
     document.querySelector("header a[href='#contact'].btn-primary") ||
     document.querySelector("header a[href='#contact']") ||
     document.querySelector("header .btn-primary");
-  const isDesktop = window.innerWidth >= 640;
 
   if (btn) {
     const rect = btn.getBoundingClientRect();
-    if (rect.width > 0 && rect.left > 0 && isDesktop) {
-      const gap = 16; // same gap from 'Get in touch' button
-      const hasRoomOnRight = rect.right + gap + 201 <= window.innerWidth;
-
-      if (hasRoomOnRight) {
-        return {
-          left: Math.round(rect.right + gap),
-          top: Math.round(rect.top + rect.height / 2),
-          isDesktop: true,
-        };
-      } else {
-        // Aligned to the rightmost edge of the header if space is tight
-        return {
-          right: 12,
-          top: Math.round(rect.top + rect.height / 2),
-          isDesktop: true,
-        };
-      }
+    if (rect.width > 0 && rect.bottom > 0) {
+      // Place directly below the "Get in touch" button with a comfortable 12px gap
+      const top = Math.round(rect.bottom + 12);
+      // Align the right edge of the toast with the right edge of the button
+      const right = Math.max(16, Math.round(window.innerWidth - rect.right));
+      return { right, top };
     }
   }
 
-  // Fallback for mobile / small screens where button is hidden: top-right below header
+  // Fallback for mobile / small screens where button is hidden: below the header bar
   const header = document.querySelector("header");
   const headerBottom = header ? header.getBoundingClientRect().bottom : 70;
 
   return {
     right: 16,
     top: Math.round(headerBottom + 12),
-    isDesktop: false,
   };
 }
 
@@ -68,25 +53,29 @@ export default function LoginSuccessToast() {
     if (!showLoginToast) return;
 
     window.addEventListener("resize", measurePosition);
+    window.addEventListener("scroll", measurePosition, { passive: true });
 
-    // Frame 1: Trigger entrance zoom-in transition on next frame
+    // Initial positioning check
+    measurePosition();
+
+    // Trigger visible spring-in on the next animation frame
     const enterFrame = requestAnimationFrame(() => {
-      measurePosition();
       setAnimPhase("visible");
     });
 
-    // Stay fully visible for ~3 seconds, then start zoom-out exit
+    // Stay visible for 3.2 seconds, then transition to exit
     const exitTimer = setTimeout(() => {
       setAnimPhase("exit");
-    }, 3000);
+    }, 3200);
 
-    // After exit transition completes (3.4s total), dismiss from context
+    // Completely dismiss after exit animation finishes
     const dismissTimer = setTimeout(() => {
       dismissLoginToast();
-    }, 3400);
+    }, 3600);
 
     return () => {
       window.removeEventListener("resize", measurePosition);
+      window.removeEventListener("scroll", measurePosition);
       cancelAnimationFrame(enterFrame);
       clearTimeout(exitTimer);
       clearTimeout(dismissTimer);
@@ -97,84 +86,156 @@ export default function LoginSuccessToast() {
     return null;
   }
 
-  const isDesktop = coords.isDesktop;
-  const baseTransform = isDesktop ? "translateY(-50%)" : "";
-
-  let transform = `${baseTransform} scale(1)`.trim();
-  let opacity = 1;
-  let transition =
-    "opacity 400ms cubic-bezier(0.16, 1, 0.3, 1), transform 400ms cubic-bezier(0.16, 1.2, 0.3, 1)";
-
-  if (animPhase === "enter") {
-    transform = `${baseTransform} scale(0.88)`.trim();
-    opacity = 0;
-    transition = "none";
-  } else if (animPhase === "exit") {
-    transform = `${baseTransform} scale(0.94)`.trim();
-    opacity = 0;
-    transition =
-      "opacity 380ms cubic-bezier(0.4, 0, 0.2, 1), transform 380ms cubic-bezier(0.4, 0, 0.2, 1)";
-  }
-
-  const containerStyle: React.CSSProperties = {
-    top: `${coords.top}px`,
-    ...(coords.right !== undefined
-      ? { right: `${coords.right}px`, left: "auto" }
-      : { left: `${coords.left}px`, right: "auto" }),
-  };
+  const isExiting = animPhase === "exit";
 
   return (
-    <div
-      id="loginSuccessToast"
-      role="status"
-      aria-live="polite"
-      className="fixed z-[100] pointer-events-none select-none"
-      style={containerStyle}
-    >
+    <>
+      <style jsx global>{`
+        @keyframes toastSpringIn {
+          0% {
+            opacity: 0;
+            transform: translateY(-16px) scale(0.86);
+            filter: blur(4px);
+          }
+          65% {
+            opacity: 1;
+            transform: translateY(3px) scale(1.02);
+            filter: blur(0px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0px);
+          }
+        }
+
+        @keyframes toastSpringOut {
+          0% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0px);
+          }
+          100% {
+            opacity: 0;
+            transform: translateY(-10px) scale(0.9);
+            filter: blur(3px);
+          }
+        }
+
+        @keyframes checkmarkPop {
+          0% {
+            transform: scale(0) rotate(-60deg);
+            opacity: 0;
+          }
+          60% {
+            transform: scale(1.22) rotate(8deg);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(1) rotate(0deg);
+            opacity: 1;
+          }
+        }
+
+        @keyframes toastProgressDeplete {
+          0% {
+            width: 100%;
+          }
+          100% {
+            width: 0%;
+          }
+        }
+
+        @keyframes toastPulseGlow {
+          0%, 100% {
+            box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.8),
+                        0 0 20px -2px rgba(217, 165, 116, 0.35),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+          }
+          50% {
+            box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.9),
+                        0 0 28px 2px rgba(217, 165, 116, 0.55),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.22);
+          }
+        }
+      `}</style>
+
       <div
-        className="inline-flex items-center gap-2.5 sm:gap-3 px-3.5 sm:px-4 py-2 sm:py-2 rounded-full border backdrop-blur-xl pointer-events-none will-change-transform"
+        id="loginSuccessToast"
+        role="status"
+        aria-live="polite"
+        className="fixed z-[100] pointer-events-auto select-none"
         style={{
-          transform,
-          opacity,
-          transition,
-          backgroundColor: "#1D1611",
-          borderColor: "rgba(217, 165, 116, 0.65)",
-          boxShadow:
-            "0 10px 30px -4px rgba(0, 0, 0, 0.85), 0 0 25px -2px rgba(185, 122, 76, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.16)",
+          top: `${coords.top}px`,
+          right: `${coords.right}px`,
         }}
       >
-        {/* Prominent Gold Checkmark Badge */}
         <div
-          className="flex h-5 w-5 items-center justify-center rounded-full shrink-0 shadow-sm"
-          style={{
-            background: "linear-gradient(135deg, var(--accent-soft), var(--accent))",
-            color: "#15100C",
+          onClick={() => {
+            setAnimPhase("exit");
+            setTimeout(dismissLoginToast, 350);
           }}
-          aria-hidden="true"
+          title="Click to dismiss"
+          className="group relative overflow-hidden flex items-center gap-2.5 sm:gap-3 px-4 py-2.5 rounded-full border backdrop-blur-xl cursor-pointer will-change-transform transition-transform hover:scale-[1.03] active:scale-[0.98]"
+          style={{
+            animation: isExiting
+              ? "toastSpringOut 350ms cubic-bezier(0.4, 0, 0.2, 1) forwards"
+              : "toastSpringIn 420ms cubic-bezier(0.16, 1.35, 0.3, 1) forwards, toastPulseGlow 2.5s ease-in-out infinite",
+            backgroundColor: "#1D1611",
+            borderColor: "rgba(217, 165, 116, 0.7)",
+          }}
         >
-          <svg
-            width="11"
-            height="11"
-            viewBox="0 0 12 12"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="shrink-0"
+          {/* Animated Gold Checkmark Badge */}
+          <div
+            className="flex h-5 w-5 items-center justify-center rounded-full shrink-0 shadow-sm"
+            style={{
+              background: "linear-gradient(135deg, var(--accent-soft), var(--accent))",
+              color: "#15100C",
+              animation: "checkmarkPop 480ms cubic-bezier(0.175, 0.885, 0.32, 1.275) 80ms backwards",
+            }}
+            aria-hidden="true"
           >
-            <path
-              d="M2.5 6.25L4.75 8.5L9.5 3.5"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 12 12"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="shrink-0"
+            >
+              <path
+                d="M2.5 6.25L4.75 8.5L9.5 3.5"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
 
-        {/* Crisp Text */}
-        <span className="font-sans text-xs sm:text-[13px] font-semibold tracking-tight whitespace-nowrap text-[#FAF7F2]">
-          Successfully logged in
-        </span>
+          {/* Crisp Message Text */}
+          <span className="font-sans text-xs sm:text-[13px] font-semibold tracking-tight whitespace-nowrap text-[#FAF7F2]">
+            Successfully logged in
+          </span>
+
+          {/* Subtle Close '×' Icon on hover */}
+          <span
+            className="opacity-40 group-hover:opacity-100 transition-opacity text-xs font-mono ml-0.5 text-[#D9A574]"
+            aria-hidden="true"
+          >
+            ×
+          </span>
+
+          {/* Slim Timer Depletion Line at the bottom */}
+          <div
+            className="absolute bottom-0 left-0 h-[2px] rounded-full pointer-events-none"
+            style={{
+              background: "linear-gradient(90deg, #B97A4C, #F0A15A)",
+              animation: "toastProgressDeplete 3200ms linear forwards",
+            }}
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
 }
