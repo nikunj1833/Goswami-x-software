@@ -15,10 +15,10 @@ export default function StatsSection() {
           >
             <span className="stat-icon" style={{ color: "#B8611F" }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6" />
-                <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6" />
-                <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6" />
-                <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6" />
+                <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
               </svg>
             </span>
             <p
@@ -44,8 +44,8 @@ export default function StatsSection() {
           >
             <span className="stat-icon" style={{ color: "#F0A15A" }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6" />
-                <path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.6" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
               </svg>
             </span>
             <p
@@ -71,7 +71,7 @@ export default function StatsSection() {
                 <path
                   d="M14.5 3.5 21 10l-4.2 4.2M9.5 20.5 3 14l4.2-4.2M6 18 18 6"
                   stroke="currentColor"
-                  stroke-width="1.6"
+                  strokeWidth="1.6"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
@@ -103,7 +103,7 @@ export default function StatsSection() {
                 <path
                   d="m4 12.5 5.5 5.5L20 7"
                   stroke="currentColor"
-                  stroke-width="1.8"
+                  strokeWidth="1.8"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />

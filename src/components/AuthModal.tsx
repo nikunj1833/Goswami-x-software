@@ -44,11 +44,10 @@ export default function AuthModal() {
       const result = await signInWithGoogle();
       if (result?.error) {
         setError(result.error);
-        setSubmitting(false);
       }
-      // If no error, browser redirects to Google OAuth
     } catch {
       setError("An unexpected error occurred while connecting to Google. Please try again.");
+    } finally {
       setSubmitting(false);
     }
   };
@@ -140,7 +139,7 @@ export default function AuthModal() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>{submitting ? "Redirecting to Google..." : "Continue with Google"}</span>
+            <span>{submitting ? "Connecting to Google..." : "Continue with Google"}</span>
           </button>
 
           {error && (
@@ -154,7 +153,7 @@ export default function AuthModal() {
           className="mt-8 text-center text-[11px] leading-relaxed"
           style={{ color: "var(--fg-soft)" }}
         >
-          Secure Google authentication powered by Supabase Auth.
+          Secure account authentication and profile access.
         </p>
       </div>
     </div>

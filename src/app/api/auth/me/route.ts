@@ -21,12 +21,15 @@ export async function GET(request: Request) {
       authenticated: true,
       user: {
         uid: authResult.profile.uid,
-        phoneNumber: authResult.profile.phoneNumber,
         displayName: authResult.profile.displayName,
         email: authResult.profile.email,
+        photoURL: authResult.profile.photoURL,
+        phoneNumber: authResult.profile.phoneNumber,
         role: authResult.profile.role,
         status: authResult.profile.status,
         authProvider: authResult.profile.authProvider,
+        createdAt: authResult.profile.createdAt,
+        updatedAt: authResult.profile.updatedAt,
       },
     });
   } catch (err) {

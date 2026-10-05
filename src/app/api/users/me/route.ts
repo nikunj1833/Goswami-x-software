@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateServerRequest } from "@/lib/auth/users";
 import { updateUserProfileSchema } from "@/lib/validations/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getAdminApp } from "@/lib/firebase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -53,40 +53,28 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const adminSupabase = createAdminClient();
+    const displayName = parseResult.data.displayName?.trim() || authResult.profile.displayName;
+    const email = parseResult.data.email !== undefined ? parseResult.data.email : authResult.profile.email;
+    const now = new Date().toISOString();
 
-    const safeUpdates: Record<string, unknown> = {
-      updated_at: new Date().toISOString(),
-    };
-
-    if (parseResult.data.displayName !== undefined) {
-      safeUpdates.full_name = parseResult.data.displayName.trim();
+    try {
+      const { db: adminDb } = getAdminApp();
+      await adminDb.collection("users").doc(authResult.uid).update({
+        displayName,
+        ...(email !== undefined ? { email } : {}),
+        updatedAt: now,
+      });
+    } catch (e) {
+      console.warn("[Users Me PATCH] Firestore sync warning:", e instanceof Error ? e.message : e);
     }
-
-    const { data: updatedProfile, error } = await adminSupabase
-      .from("profiles")
-      .update(safeUpdates)
-      .eq("id", authResult.uid)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("[Users Me PATCH Database Error]", error);
-      return NextResponse.json(
-        { success: false, error: "Failed to update profile." },
-        { status: 500 }
-      );
-    }
-
-    const displayName = updatedProfile?.full_name || authResult.profile.displayName;
 
     return NextResponse.json({
       success: true,
       profile: {
         ...authResult.profile,
         displayName,
-        phoneNumber: updatedProfile?.phone || authResult.profile.phoneNumber,
-        updatedAt: updatedProfile?.updated_at || safeUpdates.updated_at,
+        email,
+        updatedAt: now,
       },
     });
   } catch (err) {

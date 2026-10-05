@@ -1,167 +1,154 @@
-import { createClient as createServerClient } from "@/lib/supabase/server";
-import { createClient as createApiClient, type User as SupabaseUser } from "@supabase/supabase-js";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getAdminApp } from "@/lib/firebase/admin";
 
 export interface UserProfile {
   id: string;
   uid: string;
-  phoneNumber?: string | null;
-  phoneNumberNormalized?: string | null;
   displayName: string;
   email?: string | null;
   photoURL?: string | null;
+  phoneNumber?: string | null;
   role: "user" | "admin";
   status: "active" | "suspended";
   authProvider: string;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AuthenticateServerResult {
   uid: string;
   role: string;
   profile: UserProfile;
-  supabaseUser: SupabaseUser;
 }
 
 /**
- * Verifies Supabase session from cookies or Authorization Bearer header.
- * Ensures corresponding public.profiles record exists in Supabase.
+ * Extracts a Bearer token or session/token cookie from incoming HTTP request.
  */
-export async function authenticateServerRequest(
-  request: Request
-): Promise<AuthenticateServerResult | null> {
-  let user: SupabaseUser | null = null;
-
-  // 1. Try checking session via Supabase server cookies
-  try {
-    const supabaseServer = await createServerClient();
-    const { data, error } = await supabaseServer.auth.getUser();
-    if (!error && data?.user) {
-      user = data.user;
-    }
-  } catch {
-    // Cookie context unavailable or no session cookie
+export function extractTokenFromRequest(request: Request): string | null {
+  // 1. Check Authorization header: 'Bearer <token>'
+  const authHeader = request.headers.get("authorization") || request.headers.get("Authorization");
+  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+    const token = authHeader.substring(7).trim();
+    if (token) return token;
   }
 
-  // 2. Fallback to Authorization: Bearer <access_token> header
-  if (!user) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.split("Bearer ")[1]?.trim();
-      if (token) {
-        try {
-          const directClient = createApiClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL ||
-              "https://pjjtytivwvmetapbysvq.supabase.co",
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-              process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-              "sb_publishable_iXMtChaLg5sidNk8u6WwHQ_ZxunEk75"
-          );
-          const { data, error } = await directClient.auth.getUser(token);
-          if (!error && data?.user) {
-            user = data.user;
-          }
-        } catch {
-          // Token verification failure
-        }
+  // 2. Check Cookie header: 'token=...' or 'session=...'
+  const cookieHeader = request.headers.get("cookie");
+  if (cookieHeader) {
+    const cookies = cookieHeader.split(";").map((c) => c.trim());
+    for (const cookie of cookies) {
+      if (cookie.startsWith("token=")) {
+        const token = cookie.substring("token=".length).trim();
+        if (token) return decodeURIComponent(token);
+      }
+      if (cookie.startsWith("session=")) {
+        const token = cookie.substring("session=".length).trim();
+        if (token) return decodeURIComponent(token);
       }
     }
   }
 
-  if (!user) {
-    return null;
-  }
-
-  // 3. Query or initialize profile in public.profiles table
-  let profileRecord: {
-    id: string;
-    full_name: string | null;
-    phone: string | null;
-    created_at?: string;
-    updated_at?: string;
-  } | null = null;
-
-  try {
-    const adminSupabase = createAdminClient();
-    const { data } = await adminSupabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (!data) {
-      const fallbackName =
-        (user.user_metadata?.full_name as string | undefined) ||
-        (user.user_metadata?.name as string | undefined) ||
-        (user.email ? user.email.split("@")[0] : "User");
-
-      const { data: inserted } = await adminSupabase
-        .from("profiles")
-        .insert({
-          id: user.id,
-          full_name: fallbackName,
-          phone: user.phone || null,
-        })
-        .select()
-        .single();
-      profileRecord = inserted;
-    } else {
-      profileRecord = data;
-    }
-  } catch (dbErr) {
-    console.error("[authenticateServerRequest] Profile sync warning:", dbErr);
-  }
-
-  const email = user.email || null;
-  const displayName =
-    profileRecord?.full_name ||
-    (user.user_metadata?.full_name as string | undefined) ||
-    (user.user_metadata?.name as string | undefined) ||
-    (email ? email.split("@")[0] : "User");
-
-  const profile: UserProfile = {
-    id: user.id,
-    uid: user.id,
-    displayName,
-    email,
-    phoneNumber: profileRecord?.phone || user.phone || null,
-    phoneNumberNormalized: profileRecord?.phone || user.phone || null,
-    photoURL: (user.user_metadata?.avatar_url as string | undefined) || null,
-    role: "user",
-    status: "active",
-    authProvider: user.app_metadata?.provider || "google",
-    createdAt: profileRecord?.created_at || user.created_at,
-    updatedAt: profileRecord?.updated_at || user.updated_at,
-  };
-
-  return {
-    uid: user.id,
-    role: "user",
-    profile,
-    supabaseUser: user,
-  };
+  return null;
 }
 
 /**
- * Legacy stub for deprecated WhatsApp auth flow (preserved for backward compatibility).
+ * Securely verifies a Firebase ID token and synchronizes/retrieves the canonical
+ * user profile in Firestore under `users/{firebaseUid}`.
+ * Never trusts client-supplied user parameters.
  */
-export async function getOrCreateWhatsAppUser(
-  phoneNumberNormalized: string,
-  displayNameInput?: string
-) {
-  return {
-    customToken: "deprecated",
-    uid: "legacy-whatsapp-user",
-    isNewUser: false,
-    profile: {
-      id: "legacy-whatsapp-user",
-      uid: "legacy-whatsapp-user",
-      phoneNumber: phoneNumberNormalized,
-      displayName: displayNameInput || "User",
-      role: "user" as const,
-      status: "active" as const,
-      authProvider: "whatsapp" as const,
-    },
-  };
+export async function authenticateServerRequest(
+  request: Request
+): Promise<AuthenticateServerResult | null> {
+  const token = extractTokenFromRequest(request);
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const { auth: adminAuth, db: adminDb } = getAdminApp();
+    const decodedToken = await adminAuth.verifyIdToken(token);
+
+    if (!decodedToken || !decodedToken.uid) {
+      return null;
+    }
+
+    const uid = decodedToken.uid;
+    const email = decodedToken.email || null;
+    const displayName =
+      decodedToken.name ||
+      (email ? email.split("@")[0] : "User");
+    const photoURL = decodedToken.picture || null;
+    const now = new Date().toISOString();
+
+    let profile: UserProfile = {
+      id: uid,
+      uid,
+      displayName,
+      email,
+      photoURL,
+      phoneNumber: decodedToken.phone_number || null,
+      role: "user",
+      status: "active",
+      authProvider: "google",
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Check if Firebase service account or GCP environment credentials are configured
+    const hasServerCredentials = Boolean(
+      (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) ||
+      process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+      process.env.K_SERVICE
+    );
+
+    if (hasServerCredentials) {
+      try {
+        const userRef = adminDb.collection("users").doc(uid);
+        const docSnap = await Promise.race([
+          userRef.get(),
+          new Promise<null>((_, reject) =>
+            setTimeout(() => reject(new Error("Firestore operation timed out")), 3000)
+          ),
+        ]);
+
+        if (docSnap && !docSnap.exists) {
+          // First login: create canonical user document
+          await userRef.set(profile);
+        } else if (docSnap && docSnap.exists) {
+          // Returning user: update profile fields, preserve createdAt and role
+          const existingData = docSnap.data();
+          profile = {
+            id: uid,
+            uid,
+            displayName: displayName || existingData?.displayName || "User",
+            email: email || existingData?.email || null,
+            photoURL: photoURL || existingData?.photoURL || null,
+            phoneNumber: existingData?.phoneNumber || decodedToken.phone_number || null,
+            role: (existingData?.role as "user" | "admin") || "user",
+            status: (existingData?.status as "active" | "suspended") || "active",
+            authProvider: "google",
+            createdAt: existingData?.createdAt || now,
+            updatedAt: now,
+          };
+
+          await userRef.update({
+            displayName: profile.displayName,
+            email: profile.email,
+            photoURL: profile.photoURL,
+            updatedAt: now,
+          });
+        }
+      } catch (dbErr) {
+        console.warn("[Auth Users] Firestore sync skipped or timed out:", dbErr instanceof Error ? dbErr.message : dbErr);
+      }
+    }
+
+    return {
+      uid,
+      role: profile.role,
+      profile,
+    };
+  } catch (err) {
+    console.warn("[Auth Token Verification Failed]", err instanceof Error ? err.message : err);
+    return null;
+  }
 }

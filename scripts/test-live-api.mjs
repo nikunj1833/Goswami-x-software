@@ -4,7 +4,7 @@
 
 import assert from "assert";
 
-const BASE_URL = "http://localhost:3001";
+const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 
 async function run() {
   console.log("==================================================");
@@ -60,51 +60,14 @@ async function run() {
     assert.strictEqual(res.status, 401);
   });
 
-  // 5. WhatsApp Auth Start input validation
-  await test("POST /api/auth/whatsapp/start with empty body returns 400", async () => {
-    const res = await fetch(`${BASE_URL}/api/auth/whatsapp/start`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+  // 5. Auth me protected endpoint with invalid Bearer token returns 401
+  await test("GET /api/auth/me with invalid Bearer token returns 401 Unauthorized", async () => {
+    const res = await fetch(`${BASE_URL}/api/auth/me`, {
+      headers: { Authorization: "Bearer invalid_forged_firebase_id_token" },
     });
-    assert.strictEqual(res.status, 400);
+    assert.strictEqual(res.status, 401);
     const data = await res.json();
-    assert.strictEqual(data.success, false);
-  });
-
-  await test("POST /api/auth/whatsapp/start with invalid phone returns 400", async () => {
-    const res = await fetch(`${BASE_URL}/api/auth/whatsapp/start`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phoneNumber: "1234" }),
-    });
-    assert.strictEqual(res.status, 400);
-    const data = await res.json();
-    assert.strictEqual(data.success, false);
-  });
-
-  // 6. WhatsApp Auth Verify input validation
-  await test("POST /api/auth/whatsapp/verify with invalid challengeId returns 400", async () => {
-    const res = await fetch(`${BASE_URL}/api/auth/whatsapp/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ challengeId: "not-a-uuid", code: "123456" }),
-    });
-    assert.strictEqual(res.status, 400);
-    const data = await res.json();
-    assert.strictEqual(data.success, false);
-  });
-
-  await test("POST /api/auth/whatsapp/verify with invalid 4-digit code returns 400", async () => {
-    const res = await fetch(`${BASE_URL}/api/auth/whatsapp/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        challengeId: "123e4567-e89b-12d3-a456-426614174000",
-        code: "1234",
-      }),
-    });
-    assert.strictEqual(res.status, 400);
+    assert.strictEqual(data.authenticated, false);
   });
 
   // 7. Contact form validation

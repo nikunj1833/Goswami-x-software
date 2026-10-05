@@ -77,12 +77,12 @@ export default function PrivacyPolicyPage() {
             <div className="mt-4 space-y-4">
               <div>
                 <h3 className="font-medium" style={{ color: "var(--fg)" }}>
-                  A. Authentication Data (Google OAuth via Supabase)
+                  A. Authentication Data
                 </h3>
                 <p className="mt-1">
-                  When you sign in using Google OAuth, authentication is handled through Supabase Auth.
-                  We receive basic account information provided by Google, including your verified email
-                  address, name, and profile picture URL. We never have access to or store your Google password.
+                  When you sign in, authentication is handled securely.
+                  We receive basic account information including your verified email
+                  address, name, and profile picture URL. We never have access to or store your passwords.
                 </p>
               </div>
 
@@ -125,7 +125,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>
-                <strong>Authentication Cookies:</strong> Secure session cookies managed by Supabase Auth
+                <strong>Authentication Cookies:</strong> Secure session cookies managed by our authentication system
                 to keep you signed in across page navigation and reloads.
               </li>
               <li>
@@ -178,8 +178,8 @@ export default function PrivacyPolicyPage() {
                 protecting data exchange between your browser and our servers.
               </li>
               <li>
-                <strong>Supabase:</strong> Provides managed cloud database storage and authentication services.
-                Access to user profiles is constrained to authenticated user sessions.
+                <strong>Cloud Database:</strong> Managed cloud database storage and authentication services
+                protecting user data and profiles.
               </li>
               <li>
                 <strong>Google Identity Services:</strong> Facilitates OAuth 2.0 authentication verification.

@@ -6,11 +6,14 @@ import React, {
   useEffect,
   useState,
   useCallback,
-  useMemo,
 } from "react";
-import type { User as SupabaseUser, Session } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/client";
-import { getAuthCallbackUrl } from "@/lib/auth/url";
+import {
+  signInWithPopup,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  type User as FirebaseUser,
+} from "firebase/auth";
+import { auth, getGoogleProvider } from "@/lib/firebase/client";
 
 export interface UserProfile {
   id: string;
@@ -18,15 +21,15 @@ export interface UserProfile {
   email: string;
   displayName: string;
   name: string;
+  photoURL?: string | null;
   phoneNumber?: string | null;
   role?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface AuthContextType {
   user: UserProfile | null;
-  supabaseUser: SupabaseUser | null;
-  session: Session | null;
   loading: boolean;
   authError: string | null;
   clearAuthError: () => void;
@@ -34,210 +37,50 @@ export interface AuthContextType {
   openAuth: (mode?: string) => void;
   closeAuth: () => void;
   signInWithGoogle: () => Promise<{ error?: string }>;
-  signInWithOtp: (email: string) => Promise<{ success: boolean; error?: string }>;
-  verifyOtp: (email: string, token: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   getIdToken: () => Promise<string | null>;
+  showLoginToast: boolean;
+  toastKey: number;
+  dismissLoginToast: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function buildUserProfile(
-  sbUser: SupabaseUser,
-  profile?: { full_name?: string | null; phone?: string | null } | null
-): UserProfile {
-  const email = sbUser.email || "";
-  const rawName =
-    profile?.full_name ||
-    (sbUser.user_metadata?.full_name as string | undefined) ||
-    (sbUser.user_metadata?.name as string | undefined) ||
-    (email ? email.split("@")[0] : "User");
-
-  return {
-    id: sbUser.id,
-    uid: sbUser.id,
-    email,
-    displayName: rawName,
-    name: rawName,
-    phoneNumber: profile?.phone || sbUser.phone || null,
-    role: "user",
-    createdAt: sbUser.created_at,
-  };
+function setTokenCookie(token: string | null) {
+  if (typeof document === "undefined") return;
+  if (token) {
+    document.cookie = `token=${encodeURIComponent(token)}; path=/; SameSite=Lax; max-age=86400`;
+  } else {
+    document.cookie = "token=; path=/; max-age=0; SameSite=Lax";
+    document.cookie = "session=; path=/; max-age=0; SameSite=Lax";
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const supabase = useMemo(() => createClient(), []);
-
-  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(() => Boolean(auth));
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [showLoginToast, setShowLoginToast] = useState(false);
+  const [toastKey, setToastKey] = useState(0);
+
+  const triggerLoginToast = useCallback(() => {
+    setShowLoginToast(true);
+    setToastKey((prev) => prev + 1);
+  }, []);
+
+  const dismissLoginToast = useCallback(() => {
+    setShowLoginToast(false);
+  }, []);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+      (window as unknown as Record<string, unknown>).__triggerLoginToast = triggerLoginToast;
+      (window as unknown as Record<string, unknown>).__dismissLoginToast = dismissLoginToast;
+    }
+  }, [triggerLoginToast, dismissLoginToast]);
 
   const clearAuthError = useCallback(() => setAuthError(null), []);
-
-  // Sync Supabase user with public.profiles record
-  const syncUserProfile = useCallback(
-    async (sbUser: SupabaseUser | null): Promise<UserProfile | null> => {
-      if (!sbUser) return null;
-
-      try {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", sbUser.id)
-          .maybeSingle();
-
-        const baseProfile = buildUserProfile(sbUser, profile);
-
-        if (!profile) {
-          try {
-            await supabase.from("profiles").insert({
-              id: sbUser.id,
-              full_name: baseProfile.name,
-            });
-          } catch {}
-        }
-
-        return baseProfile;
-      } catch (err) {
-        console.warn("[AuthContext] Profile sync notice:", err);
-        return buildUserProfile(sbUser);
-      }
-    },
-    [supabase]
-  );
-
-  // Initialize session and subscribe to auth changes
-  useEffect(() => {
-    let mounted = true;
-
-    // Detect OAuth errors passed in URL
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const errorParam = params.get("error");
-      const errorDesc = params.get("error_description");
-
-      let detectedError: string | null = null;
-      if (errorParam) {
-        detectedError = errorDesc ? `${errorParam}: ${errorDesc}` : errorParam;
-      } else if (window.location.hash && window.location.hash.includes("error")) {
-        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-        const hashErr = hashParams.get("error");
-        const hashDesc = hashParams.get("error_description");
-        if (hashErr) {
-          detectedError = hashDesc ? `${hashErr}: ${hashDesc}` : hashErr;
-        }
-      }
-
-      if (detectedError && mounted) {
-        console.error("[AuthContext] OAuth error detected from URL:", detectedError);
-        setAuthError(detectedError);
-        const cleanUrl = new URL(window.location.href);
-        cleanUrl.searchParams.delete("error");
-        cleanUrl.searchParams.delete("error_description");
-        cleanUrl.searchParams.delete("error_code");
-        if (cleanUrl.hash.includes("error")) {
-          cleanUrl.hash = "";
-        }
-        window.history.replaceState({}, document.title, cleanUrl.toString());
-      }
-    }
-
-    // 1. Initial session fetch
-    async function initAuth() {
-      try {
-        const {
-          data: { session: initialSession },
-          error,
-        } = await supabase.auth.getSession();
-
-        console.log("[AuthTrace][Browser getSession Result]", {
-          hasSession: Boolean(initialSession),
-          hasUser: Boolean(initialSession?.user),
-          provider: initialSession?.user?.app_metadata?.provider ?? null,
-          hasEmail: Boolean(initialSession?.user?.email),
-          error: error?.message,
-        });
-
-        if (mounted) {
-          if (initialSession?.user) {
-            setSession(initialSession);
-            setSupabaseUser(initialSession.user);
-            const profile = await syncUserProfile(initialSession.user);
-            if (mounted) setUser(profile);
-          } else {
-            setSession(null);
-            setSupabaseUser(null);
-            setUser(null);
-          }
-        }
-      } catch (err) {
-        console.error("[AuthContext] Init auth error:", err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-
-    initAuth();
-
-    // 2. Subscribe once to onAuthStateChange
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      if (!mounted) return;
-
-      console.log("[AuthTrace][onAuthStateChange Event]", {
-        event,
-        hasSession: Boolean(currentSession),
-        hasUser: Boolean(currentSession?.user),
-        provider: currentSession?.user?.app_metadata?.provider ?? null,
-        hasEmail: Boolean(currentSession?.user?.email),
-      });
-
-      if (event === "SIGNED_OUT") {
-        setSession(null);
-        setSupabaseUser(null);
-        setUser(null);
-        return;
-      }
-
-      if (event === "INITIAL_SESSION") {
-        if (currentSession?.user) {
-          setSession(currentSession);
-          setSupabaseUser(currentSession.user);
-          const profile = await syncUserProfile(currentSession.user);
-          if (mounted) setUser(profile);
-        }
-        return;
-      }
-
-      if (currentSession?.user) {
-        setSession(currentSession);
-        setSupabaseUser(currentSession.user);
-        setIsAuthOpen(false);
-        const profile = await syncUserProfile(currentSession.user);
-        if (mounted) setUser(profile);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [supabase, syncUserProfile]);
-
-  useEffect(() => {
-    console.log("[AuthTrace][AuthContext Final User State]", {
-      hasUser: Boolean(user),
-      hasSupabaseUser: Boolean(supabaseUser),
-      hasSession: Boolean(session),
-      loading,
-      userInitial: user?.name ? user.name.charAt(0) : null,
-      emailInitial: user?.email ? user.email.charAt(0) : null,
-    });
-  }, [user, supabaseUser, session, loading]);
 
   const openAuth = useCallback((mode?: string) => {
     void mode;
@@ -248,142 +91,198 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthOpen(false);
   }, []);
 
-  /**
-   * Initiates Google OAuth authentication via Supabase Auth
-   */
-  const signInWithGoogle = useCallback(async () => {
+  const getIdToken = useCallback(async (): Promise<string | null> => {
+    if (!auth?.currentUser) return null;
     try {
-      setAuthError(null);
-      const callbackUrl = getAuthCallbackUrl();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: callbackUrl,
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-          },
-        },
-      });
+      return await auth.currentUser.getIdToken();
+    } catch {
+      return null;
+    }
+  }, []);
 
-      if (error) {
-        setAuthError(error.message);
-        return { error: error.message };
+  // Listen to Firebase client auth state changes
+  useEffect(() => {
+    if (!auth) {
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        try {
+          const idToken = await firebaseUser.getIdToken();
+          setTokenCookie(idToken);
+
+          const fallbackName =
+            firebaseUser.displayName ||
+            (firebaseUser.email ? firebaseUser.email.split("@")[0] : "User");
+
+          const clientProfile: UserProfile = {
+            id: firebaseUser.uid,
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || "",
+            displayName: fallbackName,
+            name: fallbackName,
+            photoURL: firebaseUser.photoURL || null,
+            phoneNumber: firebaseUser.phoneNumber || null,
+            createdAt: firebaseUser.metadata.creationTime,
+          };
+
+          setUser(clientProfile);
+
+          // If this session just authenticated via Google (e.g. returning to homepage after redirect/reload)
+          if (
+            typeof window !== "undefined" &&
+            sessionStorage.getItem("login_success_pending") === "true"
+          ) {
+            sessionStorage.removeItem("login_success_pending");
+            triggerLoginToast();
+          }
+
+          // Synchronize with server Admin verification & canonical Firestore document
+          fetch("/api/auth/me", {
+            headers: {
+              Authorization: `Bearer ${idToken}`,
+            },
+          })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (data?.authenticated && data?.user) {
+                setUser((prev) => ({
+                  ...(prev || clientProfile),
+                  id: data.user.uid,
+                  uid: data.user.uid,
+                  email: data.user.email || prev?.email || "",
+                  displayName: data.user.displayName || prev?.displayName || fallbackName,
+                  name: data.user.displayName || prev?.name || fallbackName,
+                  photoURL: data.user.photoURL || prev?.photoURL || null,
+                  phoneNumber: data.user.phoneNumber || prev?.phoneNumber || null,
+                  role: data.user.role,
+                  createdAt: data.user.createdAt || prev?.createdAt,
+                  updatedAt: data.user.updatedAt,
+                }));
+              }
+            })
+            .catch(() => {});
+        } catch (err) {
+          console.warn("[AuthContext] Error retrieving auth token:", err);
+        }
+      } else {
+        setTokenCookie(null);
+        setUser(null);
       }
+      setLoading(false);
+    });
 
-      return {};
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Failed to initiate Google login.";
+    return () => unsubscribe();
+  }, [triggerLoginToast]);
+
+  const signInWithGoogle = useCallback(async (): Promise<{ error?: string }> => {
+    if (!auth) {
+      const msg = "Firebase Auth is not configured. Missing NEXT_PUBLIC_FIREBASE_API_KEY and NEXT_PUBLIC_FIREBASE_PROJECT_ID.";
       setAuthError(msg);
       return { error: msg };
     }
-  }, [supabase]);
 
-  /**
-   * Dispatches a real 6-digit OTP code to the provided email address via Supabase Auth
-   */
-  const signInWithOtp = useCallback(
-    async (email: string) => {
-      try {
-        const cleanEmail = email.trim().toLowerCase();
-        const { error } = await supabase.auth.signInWithOtp({
-          email: cleanEmail,
-          options: {
-            shouldCreateUser: true,
-          },
+    try {
+      setAuthError(null);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("login_success_pending", "true");
+      }
+      const provider = getGoogleProvider();
+      const result = await signInWithPopup(auth, provider);
+      const idToken = await result.user.getIdToken();
+      setTokenCookie(idToken);
+
+      const displayName =
+        result.user.displayName ||
+        (result.user.email ? result.user.email.split("@")[0] : "User");
+
+      const profile: UserProfile = {
+        id: result.user.uid,
+        uid: result.user.uid,
+        email: result.user.email || "",
+        displayName,
+        name: displayName,
+        photoURL: result.user.photoURL || null,
+        phoneNumber: result.user.phoneNumber || null,
+        createdAt: result.user.metadata.creationTime,
+      };
+
+      setUser(profile);
+      setIsAuthOpen(false);
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("login_success_pending");
+      }
+      triggerLoginToast();
+
+      // Verify token on server and sync/create Firestore user document in background
+      fetch("/api/auth/me", {
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((verifyData) => {
+          if (verifyData?.authenticated && verifyData?.user) {
+            setUser((prev) => ({
+              ...(prev || profile),
+              ...verifyData.user,
+              name: verifyData.user.displayName || profile.name,
+            }));
+          }
+        })
+        .catch((syncErr) => {
+          console.warn("[AuthContext] Server sync warning after Google login:", syncErr);
         });
 
-        if (error) {
-          return { success: false, error: error.message };
-        }
-
-        return { success: true };
-      } catch (err: unknown) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : "An unexpected error occurred while sending OTP.";
-        return { success: false, error: msg };
+      return {};
+    } catch (err: unknown) {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("login_success_pending");
       }
-    },
-    [supabase]
-  );
-
-  /**
-   * Verifies the 6-digit OTP token and establishes an authenticated Supabase session
-   */
-  const verifyOtp = useCallback(
-    async (email: string, token: string) => {
-      try {
-        const cleanEmail = email.trim().toLowerCase();
-        const cleanToken = token.trim();
-
-        const { data, error } = await supabase.auth.verifyOtp({
-          email: cleanEmail,
-          token: cleanToken,
-          type: "email",
-        });
-
-        if (error) {
-          return { success: false, error: error.message };
+      let message = "Failed to sign in with Google. Please try again.";
+      if (err && typeof err === "object") {
+        const errorObj = err as Record<string, unknown>;
+        if (errorObj.code === "auth/popup-closed-by-user") {
+          return { error: "Google sign-in popup was closed." };
         }
-
-        if (data.session && data.user) {
-          setSession(data.session);
-          setSupabaseUser(data.user);
-          const profile = await syncUserProfile(data.user);
-          setUser(profile);
-          setIsAuthOpen(false);
+        if (errorObj.code === "auth/popup-blocked") {
+          message = "Sign-in popup was blocked by browser. Please allow popups for this site.";
+        } else if (errorObj.code === "auth/unauthorized-domain") {
+          message = "This domain is not authorized for Google Sign-In in Firebase Console.";
+        } else if (typeof errorObj.message === "string") {
+          message = errorObj.message;
         }
-
-        return { success: true };
-      } catch (err: unknown) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : "An unexpected error occurred during OTP verification.";
-        return { success: false, error: msg };
       }
-    },
-    [supabase, syncUserProfile]
-  );
+      setAuthError(message);
+      return { error: message };
+    }
+  }, [triggerLoginToast]);
 
-  /**
-   * Signs out of Supabase and clears local user/session state
-   */
   const signOut = useCallback(async () => {
     try {
-      await supabase.auth.signOut();
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("login_success_pending");
+      }
+      setShowLoginToast(false);
+      if (auth) {
+        await firebaseSignOut(auth).catch(() => {});
+      }
       await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
-    } catch (err) {
-      console.error("[AuthContext] Sign out error:", err);
     } finally {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("login_success_pending");
+      }
+      setTokenCookie(null);
       setUser(null);
-      setSupabaseUser(null);
-      setSession(null);
+      setShowLoginToast(false);
     }
-  }, [supabase]);
-
-  /**
-   * Returns current access token for authenticated API requests
-   */
-  const getIdToken = useCallback(async () => {
-    if (!session) {
-      const { data } = await supabase.auth.getSession();
-      return data.session?.access_token || null;
-    }
-    return session.access_token || null;
-  }, [session, supabase]);
+  }, []);
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        supabaseUser,
-        session,
         loading,
         authError,
         clearAuthError,
@@ -391,10 +290,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         openAuth,
         closeAuth,
         signInWithGoogle,
-        signInWithOtp,
-        verifyOtp,
         signOut,
         getIdToken,
+        showLoginToast,
+        toastKey,
+        dismissLoginToast,
       }}
     >
       {children}

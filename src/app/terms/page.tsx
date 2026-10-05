@@ -104,7 +104,7 @@ export default function TermsPage() {
               3. User Accounts & Session Security
             </h2>
             <p className="mt-3">
-              When using authentication features facilitated by Google OAuth and Supabase Auth:
+              When using authentication features on our website:
             </p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>

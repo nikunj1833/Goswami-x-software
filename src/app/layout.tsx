@@ -8,6 +8,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FloatingControls from "@/components/FloatingControls";
 import AuthModal from "@/components/AuthModal";
+import LoginSuccessToast from "@/components/LoginSuccessToast";
 import ScrollRevealObserver from "@/components/ScrollRevealObserver";
 import JsonLd from "@/components/JsonLd";
 
@@ -115,6 +116,7 @@ export default function RootLayout({
           <Footer />
           <FloatingControls />
           <AuthModal />
+          <LoginSuccessToast />
           <ScrollRevealObserver />
         </AuthProvider>
       </body>
