@@ -8,37 +8,63 @@ let auth: Auth | null = null;
 let db: Firestore | null = null;
 let googleProvider: GoogleAuthProvider | null = null;
 
-const clientConfig = getFirebaseClientConfig();
+export function initFirebase() {
+  if (auth && db && googleProvider) {
+    return { firebaseApp, auth, db, googleProvider };
+  }
 
-if (clientConfig) {
-  if (!getApps().length) {
-    firebaseApp = initializeApp(clientConfig);
+  const clientConfig = getFirebaseClientConfig();
+
+  if (clientConfig) {
+    try {
+      if (!getApps().length) {
+        firebaseApp = initializeApp(clientConfig);
+      } else {
+        firebaseApp = getApp();
+      }
+      auth = getAuth(firebaseApp);
+      db = getFirestore(firebaseApp);
+      if (!googleProvider) {
+        googleProvider = new GoogleAuthProvider();
+        googleProvider.setCustomParameters({
+          prompt: "select_account",
+        });
+      }
+    } catch (err) {
+      console.warn("[Firebase Client] Error initializing Firebase:", err);
+    }
   } else {
-    firebaseApp = getApp();
+    if (typeof window !== "undefined") {
+      console.warn(
+        "[Firebase Client] Firebase configuration is missing. Please set NEXT_PUBLIC_FIREBASE_API_KEY and NEXT_PUBLIC_FIREBASE_PROJECT_ID."
+      );
+    }
   }
-  auth = getAuth(firebaseApp);
-  db = getFirestore(firebaseApp);
-  googleProvider = new GoogleAuthProvider();
-  googleProvider.setCustomParameters({
-    prompt: "select_account",
-  });
-} else {
-  if (typeof window !== "undefined") {
-    console.warn(
-      "[Firebase Client] Firebase configuration is missing. Please set NEXT_PUBLIC_FIREBASE_API_KEY and NEXT_PUBLIC_FIREBASE_PROJECT_ID."
-    );
-  }
+
+  return { firebaseApp, auth, db, googleProvider };
 }
 
+// Initial eager initialization
+initFirebase();
+
 export function getClientAuth(): Auth | null {
+  if (!auth) {
+    initFirebase();
+  }
   return auth;
 }
 
 export function getClientDb(): Firestore | null {
+  if (!db) {
+    initFirebase();
+  }
   return db;
 }
 
 export function getGoogleProvider(): GoogleAuthProvider {
+  if (!googleProvider) {
+    initFirebase();
+  }
   if (!googleProvider) {
     googleProvider = new GoogleAuthProvider();
     googleProvider.setCustomParameters({

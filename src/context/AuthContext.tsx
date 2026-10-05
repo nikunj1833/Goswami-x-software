@@ -13,7 +13,7 @@ import {
   onAuthStateChanged,
   type User as FirebaseUser,
 } from "firebase/auth";
-import { auth, getGoogleProvider } from "@/lib/firebase/client";
+import { auth, getClientAuth, getGoogleProvider } from "@/lib/firebase/client";
 
 export interface UserProfile {
   id: string;
@@ -58,7 +58,7 @@ function setTokenCookie(token: string | null) {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState<boolean>(() => Boolean(auth));
+  const [loading, setLoading] = useState<boolean>(() => Boolean(auth || getClientAuth()));
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [showLoginToast, setShowLoginToast] = useState(false);
@@ -92,9 +92,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getIdToken = useCallback(async (): Promise<string | null> => {
-    if (!auth?.currentUser) return null;
+    const currentAuth = auth || getClientAuth();
+    if (!currentAuth?.currentUser) return null;
     try {
-      return await auth.currentUser.getIdToken();
+      return await currentAuth.currentUser.getIdToken();
     } catch {
       return null;
     }
@@ -102,11 +103,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Listen to Firebase client auth state changes
   useEffect(() => {
-    if (!auth) {
+    const currentAuth = auth || getClientAuth();
+    if (!currentAuth) {
+      setLoading(false);
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+    const unsubscribe = onAuthStateChanged(currentAuth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         try {
           const idToken = await firebaseUser.getIdToken();
@@ -177,7 +180,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [triggerLoginToast]);
 
   const signInWithGoogle = useCallback(async (): Promise<{ error?: string }> => {
-    if (!auth) {
+    const activeAuth = auth || getClientAuth();
+    if (!activeAuth) {
       const msg = "Firebase Auth is not configured. Missing NEXT_PUBLIC_FIREBASE_API_KEY and NEXT_PUBLIC_FIREBASE_PROJECT_ID.";
       setAuthError(msg);
       return { error: msg };
@@ -189,7 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sessionStorage.setItem("login_success_pending", "true");
       }
       const provider = getGoogleProvider();
-      const result = await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(activeAuth, provider);
       const idToken = await result.user.getIdToken();
       setTokenCookie(idToken);
 
@@ -265,8 +269,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sessionStorage.removeItem("login_success_pending");
       }
       setShowLoginToast(false);
-      if (auth) {
-        await firebaseSignOut(auth).catch(() => {});
+      const activeAuth = auth || getClientAuth();
+      if (activeAuth) {
+        await firebaseSignOut(activeAuth).catch(() => {});
       }
       await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     } finally {

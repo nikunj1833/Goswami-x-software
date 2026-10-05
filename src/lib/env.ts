@@ -13,12 +13,24 @@ export interface FirebaseClientConfig {
 }
 
 export function getFirebaseClientConfig(): FirebaseClientConfig | null {
-  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-  const messagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID;
-  const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
+  const apiKey =
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
+    "AIzaSyDLdhLM2bm1-b88wa_I4SXAwDem3TSZ65Y";
+  const projectId =
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+    "goswami-x-software";
+  const authDomain =
+    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ||
+    `${projectId}.firebaseapp.com`;
+  const storageBucket =
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+    `${projectId}.firebasestorage.app`;
+  const messagingSenderId =
+    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ||
+    "616600348642";
+  const appId =
+    process.env.NEXT_PUBLIC_FIREBASE_APP_ID ||
+    "1:616600348642:web:9fd6746a3bea0448fb7bbb";
 
   if (!apiKey || !projectId) {
     return null;
@@ -26,11 +38,11 @@ export function getFirebaseClientConfig(): FirebaseClientConfig | null {
 
   return {
     apiKey,
-    authDomain: authDomain || `${projectId}.firebaseapp.com`,
+    authDomain,
     projectId,
-    storageBucket: storageBucket || `${projectId}.appspot.com`,
-    messagingSenderId: messagingSenderId || "",
-    appId: appId || "",
+    storageBucket,
+    messagingSenderId,
+    appId,
   };
 }
 
