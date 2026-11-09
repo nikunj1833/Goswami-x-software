@@ -442,7 +442,7 @@ export default function WorkSection() {
               This Portfolio
             </h3>
             <p className="mt-4 max-w-md text-base leading-relaxed" style={{ color: "#D6C9B9" }}>
-              My personal frontend portfolio — the very site you&apos;re looking at.
+              The official RN Developer website presenting the business and its digital products.
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
               <span className="stack-tag" style={{ borderColor: "#FBF6EF", color: "#FBF6EF" }}>

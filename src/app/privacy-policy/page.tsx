@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Goswami X Software",
+  title: "Privacy Policy — RN Developer",
   description:
-    "Privacy Policy for Goswami X Software and Nikunj Giri. Understand how we collect, store, and protect your information.",
+    "Privacy Policy for RN Developer, the public-facing brand of RN SOFTWARE DEVELOPER, a sole proprietorship.",
   alternates: {
     canonical: "/privacy-policy",
   },
@@ -28,7 +28,7 @@ export default function PrivacyPolicyPage() {
         {/* Page Header */}
         <header className="mb-12 border-b pb-8" style={{ borderColor: "var(--line)" }}>
           <p className="font-mono text-xs uppercase tracking-widest" style={{ color: "var(--accent)" }}>
-            Legal Documentation · Effective October 2026
+            Legal Documentation · Effective November 2026
           </p>
           <h1
             className="mt-3 font-serif text-4xl sm:text-5xl tracking-tight"
@@ -37,7 +37,7 @@ export default function PrivacyPolicyPage() {
             Privacy Policy
           </h1>
           <p className="mt-4 text-base sm:text-lg leading-relaxed" style={{ color: "var(--fg-soft)" }}>
-            At Goswami X Software, transparency and privacy are fundamental. This document explains
+            At RN Developer, the public-facing brand of RN SOFTWARE DEVELOPER, transparency and privacy are fundamental. This document explains
             what data is collected, how it is used, and how your information is handled when using this
             website.
           </p>
@@ -57,9 +57,7 @@ export default function PrivacyPolicyPage() {
               1. Overview & Scope
             </h2>
             <p className="mt-3">
-              This Privacy Policy applies to <strong>Goswami X Software</strong>, an independent software
-              engineering and portfolio website maintained by <strong>Nikunj Giri</strong>. This policy
-              details our privacy practices regarding visitors, account holders, and project inquiries.
+              This Privacy Policy applies to <strong>RN Developer</strong>, the public-facing brand of <strong>RN SOFTWARE DEVELOPER</strong>, a sole proprietorship engaged in software, mobile application, and game development and publishing. This policy details our privacy practices regarding visitors, account holders, and project inquiries.
             </p>
           </section>
 

@@ -14,7 +14,7 @@ export default function HeroSection() {
           className="dot-pulse mr-2 inline-block h-2 w-2 rounded-full align-middle"
           style={{ backgroundColor: "var(--accent)" }}
         />
-        Full-Stack Developer · Self-Taught
+        Software Development · Apps & Games
       </p>
 
       <h1
@@ -22,7 +22,7 @@ export default function HeroSection() {
         style={{ color: "var(--fg)" }}
       >
         <span className="hero-line block" style={{ animationDelay: ".15s" }}>
-          Nikunj Giri builds
+          RN Developer builds
         </span>
         <span className="hero-line block" style={{ animationDelay: ".28s" }}>
           software that feels <span className="gradient-text italic">real</span>,
@@ -36,8 +36,7 @@ export default function HeroSection() {
         className="hero-line relative mt-8 max-w-[38rem] text-lg leading-relaxed"
         style={{ color: "var(--fg-soft)", animationDelay: ".56s" }}
       >
-        Self-taught full-stack developer building real projects across web and mobile — this is{" "}
-        <span className="gradient-text">Goswami X Software</span>.
+        RN Developer is a software development business focused on mobile applications, games, and web-based software.
       </p>
 
       <div

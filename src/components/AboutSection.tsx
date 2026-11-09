@@ -20,13 +20,10 @@ export default function AboutSection() {
             style={{ color: "var(--fg-soft)" }}
           >
             <p>
-              I&apos;m Nikunj Giri, a self-taught full-stack developer — about 2.5 years in, since late
-              2023, building real projects instead of tutorials. React.js on web, React Native and
-              native Android on mobile.
+              RN Developer is the public-facing brand of RN SOFTWARE DEVELOPER, a sole proprietorship focused on developing and publishing mobile applications, games, and web-based software.
             </p>
             <p>
-              I use AI-assisted workflows to move faster, and I care about shipping things that
-              actually work.
+              The focus is on practical digital products, reliable software, and user-friendly experiences.
             </p>
           </div>
         </div>
@@ -36,16 +33,14 @@ export default function AboutSection() {
             Currently
           </h3>
           <p className="mt-4" style={{ color: "var(--fg)" }}>
-            Building and shipping personal projects — from React Native apps to React-based web
-            tools — to sharpen my skills as a full-stack developer.
+            Developing and publishing digital products across mobile apps, games, and web-based software.
           </p>
 
           <h3 className="mt-8 font-mono text-sm" style={{ color: "var(--accent)" }}>
-            Open to
+            Business focus
           </h3>
           <p className="mt-4" style={{ color: "var(--fg)" }}>
-            Freelance work, collaborations, and opportunities to learn and build alongside other
-            developers.
+            App development, game development, web development, and software project inquiries.
           </p>
         </div>
       </div>

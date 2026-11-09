@@ -52,13 +52,13 @@ export default function StatsSection() {
               className="mt-4 font-serif text-4xl md:text-5xl"
               style={{ color: "#FFFFFF", letterSpacing: "-0.02em" }}
             >
-              2.5 yrs
+              Apps + Games
             </p>
             <p
               className="mt-2 font-mono text-[11px] uppercase tracking-wider"
               style={{ color: "#E0B48C" }}
             >
-              Self-taught journey
+              Product focus
             </p>
           </div>
 

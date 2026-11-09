@@ -137,7 +137,7 @@ export default function ContactForm() {
             id="cf-phone"
             name="phone"
             type="tel"
-            placeholder="+91 98765 43210"
+            placeholder="Phone number with country code"
             value={phone || user?.phoneNumber || ""}
             onChange={(e) => setPhone(e.target.value)}
             disabled={submitting}
@@ -158,7 +158,7 @@ export default function ContactForm() {
             name="message"
             rows={4}
             required
-            placeholder="Tell me about your project"
+            placeholder="Tell RN Developer about your project"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             disabled={submitting}
@@ -188,7 +188,7 @@ export default function ContactForm() {
         </button>
 
         <p id="cf-note" className="text-center text-xs" style={{ color: "var(--fg-soft)" }}>
-          Direct communication with Nikunj Giri. Responses within 24 hours.
+          Use this form to send an inquiry to RN Developer.
         </p>
       </div>
     </form>

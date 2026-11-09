@@ -55,11 +55,9 @@ export default function LoginSuccessToast() {
     window.addEventListener("resize", measurePosition);
     window.addEventListener("scroll", measurePosition, { passive: true });
 
-    // Initial positioning check
-    measurePosition();
-
-    // Trigger visible spring-in on the next animation frame
+    // Initial positioning check and enter animation on next frame
     const enterFrame = requestAnimationFrame(() => {
+      measurePosition();
       setAnimPhase("visible");
     });
 

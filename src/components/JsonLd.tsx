@@ -3,12 +3,12 @@ export default function JsonLd() {
     "@context": "https://schema.org",
     "@graph": [
       {
-        "@type": "Person",
-        "@id": "#person",
-        "name": "Nikunj Giri",
-        "jobTitle": "Full-Stack Developer",
+        "@type": "Organization",
+        "@id": "#organization",
+        "name": "RN Developer",
+        "legalName": "RN SOFTWARE DEVELOPER",
         "description":
-          "Self-taught full-stack developer building real projects across web and mobile — Goswami X Software.",
+          "A sole proprietorship software development business focused on mobile applications, games, and web-based software.",
         "knowsAbout": [
           "React.js",
           "React Native",
@@ -24,10 +24,10 @@ export default function JsonLd() {
       {
         "@type": "WebSite",
         "@id": "#website",
-        "name": "Goswami X Software",
-        "description": "Portfolio of Nikunj Giri, Full-Stack Developer.",
+        "name": "RN Developer",
+        "description": "Official website of RN Developer, a software development business.",
         "publisher": {
-          "@id": "#person",
+          "@id": "#organization",
         },
       },
     ],

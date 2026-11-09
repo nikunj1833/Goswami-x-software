@@ -1,5 +1,5 @@
 /**
- * End-to-End Live HTTP Test for Goswami X Software API Endpoints
+ * End-to-End Live HTTP Test for RN Developer API Endpoints
  */
 
 import assert from "assert";

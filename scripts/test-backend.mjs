@@ -1,5 +1,5 @@
 /**
- * Goswami X Software — Comprehensive Backend & Security Verification Suite
+ * RN Developer — Comprehensive Backend & Security Verification Suite
  * Tests all backend modules, validations, rate limiting, hashing, webhooks, and route logic.
  */
 
@@ -92,7 +92,7 @@ function verifyMetaWebhookSignature(rawBody, signatureHeader, appSecret) {
 // Run Test Suite
 async function runTests() {
   console.log("==================================================");
-  console.log("RUNNING GOSWAMI X SOFTWARE BACKEND TEST SUITE");
+  console.log("RUNNING RN DEVELOPER BACKEND TEST SUITE");
   console.log("==================================================\n");
 
   let passed = 0;
@@ -141,7 +141,7 @@ async function runTests() {
   // --- Group 2: Zod Validations ---
   console.log("\nGroup 2: Input Validations (Auth & Contact)");
   test("startAuthSchema accepts valid phone number", () => {
-    const parse = startAuthSchema.safeParse({ phoneNumber: "+919876543210", displayName: "Nikunj" });
+    const parse = startAuthSchema.safeParse({ phoneNumber: "+919876543210", displayName: "Test User" });
     assert.strictEqual(parse.success, true);
   });
 

@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Goswami X Software",
+  title: "Terms of Service — RN Developer",
   description:
-    "Terms of Service governing the use of Goswami X Software website, project demonstrations, and software engineering services.",
+    "Terms of Service governing the RN Developer website, software products, and development services offered by RN SOFTWARE DEVELOPER.",
   alternates: {
     canonical: "/terms",
   },
@@ -28,7 +28,7 @@ export default function TermsPage() {
         {/* Page Header */}
         <header className="mb-12 border-b pb-8" style={{ borderColor: "var(--line)" }}>
           <p className="font-mono text-xs uppercase tracking-widest" style={{ color: "var(--accent)" }}>
-            Legal Documentation · Effective October 2026
+            Legal Documentation · Effective November 2026
           </p>
           <h1
             className="mt-3 font-serif text-4xl sm:text-5xl tracking-tight"
@@ -37,8 +37,7 @@ export default function TermsPage() {
             Terms of Service
           </h1>
           <p className="mt-4 text-base sm:text-lg leading-relaxed" style={{ color: "var(--fg-soft)" }}>
-            These Terms of Service outline the terms and conditions governing the use of the Goswami X Software
-            website, software demonstrations, and development engagements.
+            These Terms of Service outline the terms and conditions governing the use of the RN Developer website, software products, and development services.
           </p>
         </header>
 
@@ -56,8 +55,8 @@ export default function TermsPage() {
               1. Acceptance of Terms
             </h2>
             <p className="mt-3">
-              By accessing or using this website (<strong>Goswami X Software</strong>, operated by{" "}
-              <strong>Nikunj Giri</strong>), you agree to these Terms of Service and our{" "}
+              By accessing or using this website (<strong>RN Developer</strong>, the public-facing brand of{" "}
+              <strong>RN SOFTWARE DEVELOPER</strong>, a sole proprietorship), you agree to these Terms of Service and our{" "}
               <Link href="/privacy-policy" className="underline hover:opacity-80" style={{ color: "var(--accent)" }}>
                 Privacy Policy
               </Link>
@@ -77,7 +76,7 @@ export default function TermsPage() {
               2. Software Development Engagements
             </h2>
             <p className="mt-3">
-              Goswami X Software provides independent full-stack web and mobile development services.
+              RN SOFTWARE DEVELOPER, operating under the public-facing brand RN Developer, is a sole proprietorship engaged in software, mobile application, and game development and publishing.
               For bespoke consulting or client development projects:
             </p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
@@ -137,9 +136,7 @@ export default function TermsPage() {
                   A. Website Content & Branding
                 </h3>
                 <p className="mt-1">
-                  The Goswami X Software brand name, website design, text content, and demonstration code
-                  showcased on this portfolio are the intellectual property of Nikunj Giri or their respective
-                  licensors.
+                  The RN Developer brand name, website design, text content, and demonstration code showcased on this website are owned by RN SOFTWARE DEVELOPER or their respective licensors, unless otherwise stated.
                 </p>
               </div>
 
@@ -195,7 +192,7 @@ export default function TermsPage() {
               purpose, or non-infringement.
             </p>
             <p className="mt-3">
-              To the fullest extent permitted by applicable law, Goswami X Software and Nikunj Giri shall not
+              To the fullest extent permitted by applicable law, RN SOFTWARE DEVELOPER shall not
               be liable for any indirect, incidental, special, or consequential damages resulting from your use
               of or inability to use this website or demonstration services.
             </p>

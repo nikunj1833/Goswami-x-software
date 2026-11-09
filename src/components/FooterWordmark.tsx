@@ -28,10 +28,10 @@ export default function FooterWordmark() {
       onMouseLeave={handleMouseLeave}
     >
       <p className="footer-mark-base" aria-hidden="true">
-        Goswami X Software
+        RN Developer
       </p>
       <p className="footer-mark-glow" aria-hidden="true">
-        Goswami X Software
+        RN Developer
       </p>
     </div>
   );

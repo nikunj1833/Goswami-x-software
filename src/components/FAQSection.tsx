@@ -1,13 +1,13 @@
 export default function FAQSection() {
   const faqs = [
     {
-      q: "Are you available for freelance work?",
-      a: "Yes — I'm currently open to freelance projects and collaborations, especially around React, React Native, and Firebase.",
+      q: "What services does RN Developer offer?",
+      a: "RN Developer focuses on mobile app development, game development, web development, and software solutions.",
       delay: "",
     },
     {
-      q: "Do you have professional work experience?",
-      a: "I'm self-taught, about 2.5 years in since late 2023, building real projects independently. No formal employment history yet — but every project here is fully working code I built myself.",
+      q: "What kind of products does RN Developer build?",
+      a: "The business develops and publishes mobile applications, games, and web-based software. Product details can be added to the website as they become available.",
       delay: "reveal-delay-1",
     },
     {
@@ -16,13 +16,13 @@ export default function FAQSection() {
       delay: "reveal-delay-2",
     },
     {
-      q: "Can I see the source code for your projects?",
-      a: "Not yet — I'm preparing repos to share publicly. Reach out and I can walk you through any project directly.",
+      q: "Where can I find your apps and games?",
+      a: "Product and store links will be added here when they are ready for public release.",
       delay: "reveal-delay-3",
     },
     {
       q: "How can I get in touch?",
-      a: "Use the contact form below. My social links are being set up and will go live soon.",
+      a: "Use the contact form below. Business contact and social links will be added when available.",
       delay: "",
     },
   ];

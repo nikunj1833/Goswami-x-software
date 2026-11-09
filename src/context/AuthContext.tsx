@@ -105,7 +105,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const currentAuth = auth || getClientAuth();
     if (!currentAuth) {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+      }, 0);
       return;
     }
 

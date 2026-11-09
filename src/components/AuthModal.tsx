@@ -97,7 +97,7 @@ export default function AuthModal() {
         </button>
 
         <p className="stack-eyebrow" style={{ color: "var(--accent)" }}>
-          Goswami X Software
+          RN Developer
         </p>
 
         <h2 id="authTitle" className="mt-2 font-serif text-3xl" style={{ color: "var(--fg)" }}>

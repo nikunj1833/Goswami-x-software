@@ -27,7 +27,7 @@ export default function Loader() {
       aria-hidden={hide}
     >
       <p className="loader-mark">
-        Goswami <b>X Software</b>
+        RN <b>Developer</b>
       </p>
       <div className="loader-bar" />
     </div>

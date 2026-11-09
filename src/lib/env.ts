@@ -13,24 +13,17 @@ export interface FirebaseClientConfig {
 }
 
 export function getFirebaseClientConfig(): FirebaseClientConfig | null {
-  const apiKey =
-    process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
-    "AIzaSyDLdhLM2bm1-b88wa_I4SXAwDem3TSZ65Y";
-  const projectId =
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
-    "goswami-x-software";
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const authDomain =
     process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ||
-    `${projectId}.firebaseapp.com`;
+    (projectId ? `${projectId}.firebaseapp.com` : "");
   const storageBucket =
     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-    `${projectId}.firebasestorage.app`;
+    (projectId ? `${projectId}.firebasestorage.app` : "");
   const messagingSenderId =
-    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ||
-    "616600348642";
-  const appId =
-    process.env.NEXT_PUBLIC_FIREBASE_APP_ID ||
-    "1:616600348642:web:9fd6746a3bea0448fb7bbb";
+    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "";
+  const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "";
 
   if (!apiKey || !projectId) {
     return null;
@@ -56,7 +49,7 @@ export function getFirebaseServerConfig(): FirebaseServerConfig {
   const projectId =
     process.env.FIREBASE_PROJECT_ID ||
     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
-    "goswami-x-software";
+    "";
 
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   let privateKey = process.env.FIREBASE_PRIVATE_KEY;
@@ -105,5 +98,9 @@ export function getWhatsAppConfig(): WhatsAppConfig {
 }
 
 export function getAuthHmacSecret(): string {
-  return process.env.AUTH_CHALLENGE_HMAC_SECRET || "default_goswami_secret_key_change_in_production";
+  const secret = process.env.AUTH_CHALLENGE_HMAC_SECRET;
+  if (!secret) {
+    throw new Error("AUTH_CHALLENGE_HMAC_SECRET environment variable is required.");
+  }
+  return secret;
 }

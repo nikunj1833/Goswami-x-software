@@ -17,7 +17,7 @@ export default function Header() {
     if (rawName && typeof rawName === "string") {
       const cleanName = rawName.trim();
       if (cleanName.length > 0) {
-        // First name initial (e.g. "Nikunj Giri" -> "Nikunj" -> "N")
+        // First name initial from the signed-in user profile
         const firstName = cleanName.split(/\s+/)[0];
         if (firstName && firstName.length > 0) {
           return firstName.charAt(0).toUpperCase();
@@ -117,7 +117,7 @@ export default function Header() {
           className="logo-mark font-serif text-[1.15rem] sm:text-2xl md:text-[1.7rem]"
           style={{ color: "var(--fg)" }}
         >
-          Goswami <span className="gradient-text italic">X Software</span>
+          RN <span className="gradient-text italic">Developer</span>
         </a>
 
         <ul

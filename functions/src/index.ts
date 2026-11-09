@@ -15,7 +15,13 @@ function getSecret(name: string, fallback = ""): string {
 }
 
 function hashOtp(code: string, phoneNumberE164: string): string {
-  const secret = getSecret("AUTH_CHALLENGE_HMAC_SECRET", "goswami_cloud_functions_secret");
+  const secret = process.env.AUTH_CHALLENGE_HMAC_SECRET;
+  if (!secret) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Authentication configuration error: missing HMAC secret."
+    );
+  }
   return crypto.createHmac("sha256", secret).update(`${phoneNumberE164}:${code}`).digest("hex");
 }
 
@@ -95,7 +101,7 @@ export const startWhatsAppAuth = functions.https.onCall(async (request) => {
         type: "text",
         text: {
           preview_url: false,
-          body: `Your Goswami X Software verification code is: *${code}*.\n\nValid for 10 minutes. Do not share this code.`,
+          body: `Your RN Developer verification code is: *${code}*.\n\nValid for 10 minutes. Do not share this code.`,
         },
       }),
     });

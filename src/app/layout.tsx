@@ -47,13 +47,14 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Goswami X Software — Nikunj Giri, Full-Stack Developer",
+  title: "RN Developer — Apps, Games & Software",
   description:
-    "Nikunj Giri — self-taught Full-Stack Developer building real projects across web and mobile, one at a time. Goswami X Software.",
+    "RN Developer is a software development business focused on mobile applications, games, and web-based software.",
   keywords: [
-    "Nikunj Giri",
-    "Goswami X Software",
-    "Full-Stack Developer",
+    "RN Developer",
+    "Software Development",
+    "Mobile App Development",
+    "Game Development",
     "React Native",
     "React.js",
     "Kotlin",
@@ -61,21 +62,21 @@ export const metadata: Metadata = {
     "Firebase",
     "TypeScript",
   ],
-  authors: [{ name: "Nikunj Giri" }],
-  creator: "Nikunj Giri",
+  authors: [{ name: "RN Developer" }],
+  creator: "RN Developer",
   openGraph: {
     type: "website",
     locale: "en_US",
-    title: "Goswami X Software — Nikunj Giri, Full-Stack Developer",
+    title: "RN Developer — Apps, Games & Software",
     description:
-      "Nikunj Giri — self-taught Full-Stack Developer building real projects across web and mobile, one at a time.",
-    siteName: "Goswami X Software",
+      "Software development business focused on mobile applications, games, and web-based software.",
+    siteName: "RN Developer",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Goswami X Software — Nikunj Giri, Full-Stack Developer",
+    title: "RN Developer — Apps, Games & Software",
     description:
-      "Nikunj Giri — self-taught Full-Stack Developer building real projects across web and mobile, one at a time.",
+      "Software development business focused on mobile applications, games, and web-based software.",
   },
   metadataBase: siteUrl ? new URL(siteUrl) : undefined,
   alternates: siteUrl ? { canonical: "/" } : undefined,

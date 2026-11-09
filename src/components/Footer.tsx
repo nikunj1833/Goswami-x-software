@@ -27,18 +27,17 @@ export default function Footer() {
         >
           <div className="max-w-sm">
             <a href="#top" className="logo-mark font-serif text-2xl" style={{ color: "var(--fg)" }}>
-              Goswami <span className="gradient-text italic">X Software</span>
+              RN <span className="gradient-text italic">Developer</span>
             </a>
             <p className="mt-4 text-sm leading-relaxed" style={{ color: "var(--fg-soft)" }}>
-              Nikunj Giri — self-taught Full-Stack Developer building real projects across web and
-              mobile, one at a time.
+              Software development focused on mobile applications, games, and web-based software.
             </p>
             <a
               href="#contact"
               className="btn-primary mt-6 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium"
               style={{ color: "var(--bg)" }}
             >
-              Start a project
+              Discuss a project
               <span aria-hidden="true">→</span>
             </a>
           </div>
@@ -91,8 +90,8 @@ export default function Footer() {
                 <span
                   className="chip flex h-10 w-10 items-center justify-center rounded-full border opacity-50"
                   style={{ borderColor: "var(--line)", cursor: "not-allowed" }}
-                  title="GitHub — add your profile link"
-                  aria-label="GitHub, coming soon"
+                  title=""
+                  aria-label="GitHub link not configured"
                 >
                   <svg
                     width="17"
@@ -112,8 +111,8 @@ export default function Footer() {
                 <span
                   className="chip flex h-10 w-10 items-center justify-center rounded-full border opacity-50"
                   style={{ borderColor: "var(--line)", cursor: "not-allowed" }}
-                  title="LinkedIn — add your profile link"
-                  aria-label="LinkedIn, coming soon"
+                  title=""
+                  aria-label="LinkedIn link not configured"
                 >
                   <svg
                     width="16"
@@ -133,8 +132,8 @@ export default function Footer() {
                 <span
                   className="chip flex h-10 w-10 items-center justify-center rounded-full border opacity-50"
                   style={{ borderColor: "var(--line)", cursor: "not-allowed" }}
-                  title="Instagram — add your profile link"
-                  aria-label="Instagram, coming soon"
+                  title=""
+                  aria-label="Instagram link not configured"
                 >
                   <svg
                     width="17"
@@ -154,8 +153,8 @@ export default function Footer() {
                 <span
                   className="chip flex h-10 w-10 items-center justify-center rounded-full border opacity-50"
                   style={{ borderColor: "var(--line)", cursor: "not-allowed" }}
-                  title="Email — add your address"
-                  aria-label="Email, coming soon"
+                  title=""
+                  aria-label="Email link not configured"
                 >
                   <svg
                     width="17"
@@ -170,9 +169,6 @@ export default function Footer() {
                   </svg>
                 </span>
               </div>
-              <p className="mt-3 text-xs" style={{ color: "var(--fg-soft)" }}>
-                Links coming soon
-              </p>
             </div>
           </div>
         </div>
@@ -182,7 +178,7 @@ export default function Footer() {
           style={{ borderColor: "var(--line)", color: "var(--fg-soft)" }}
         >
           <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-5">
-            <p>© 2026 Nikunj Giri · Goswami X Software. All rights reserved.</p>
+            <p>© 2026 RN Developer. All rights reserved.</p>
             <div className="flex items-center gap-3 text-[11px]">
               <a
                 href="/privacy-policy"
