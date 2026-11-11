@@ -1,6 +1,6 @@
 import { getApps, initializeApp, cert, type App } from "firebase-admin/app";
-import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore, FieldValue, Timestamp } from "firebase-admin/firestore";
+import type { Auth } from "firebase-admin/auth";
 import { getFirebaseServerConfig } from "@/lib/env";
 
 let adminApp: App | null = null;
@@ -16,9 +16,24 @@ export function hasFirebaseServerCredentials(): boolean {
   );
 }
 
+function getAdminAuth(app: App): Auth {
+  if (!adminAuth) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getAuth } = require("firebase-admin/auth");
+    adminAuth = getAuth(app);
+  }
+  return adminAuth!;
+}
+
 export function getAdminApp(): { app: App; auth: Auth; db: Firestore } {
-  if (adminApp && adminAuth && adminDb) {
-    return { app: adminApp, auth: adminAuth, db: adminDb };
+  if (adminApp && adminDb) {
+    return {
+      app: adminApp,
+      get auth() {
+        return getAdminAuth(adminApp!);
+      },
+      db: adminDb,
+    };
   }
 
   const existingApps = getApps();
@@ -49,10 +64,15 @@ export function getAdminApp(): { app: App; auth: Auth; db: Firestore } {
     }
   }
 
-  adminAuth = getAuth(adminApp);
   adminDb = getFirestore(adminApp);
 
-  return { app: adminApp, auth: adminAuth, db: adminDb };
+  return {
+    app: adminApp,
+    get auth() {
+      return getAdminAuth(adminApp!);
+    },
+    db: adminDb,
+  };
 }
 
 export { FieldValue, Timestamp };

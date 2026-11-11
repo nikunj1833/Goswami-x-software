@@ -16,9 +16,9 @@ export async function GET() {
     ["whatsappClient", () => import("@/lib/whatsapp/client")],
     ["rateLimit", () => import("@/lib/security/rateLimit")],
     ["firebaseAdminApp", () => import("firebase-admin/app")],
-    ["firebaseAdminAuth", () => import("firebase-admin/auth")],
     ["firebaseAdminFirestore", () => import("firebase-admin/firestore")],
     ["libFirebaseAdmin", () => import("@/lib/firebase/admin")],
+    ["contactRoute", () => import("@/app/api/contact/route")],
   ];
 
   for (const [name, fn] of testImports) {
