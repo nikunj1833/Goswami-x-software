@@ -168,38 +168,68 @@ export async function POST(request: Request) {
         );
       }
 
-      // Step 3: Primary Source of Truth — Awaited write to Firestore 'contactSubmissions'
+      // Step 3: Primary Source of Truth — Atomic transaction write with concurrency lock
       const submissionId = crypto.randomUUID();
+      const idempotencyRef = db.collection("rateLimits").doc(`idempotency_${submissionHash}`);
+      const submissionRef = db.collection("contactSubmissions").doc(submissionId);
+      let isConcurrentDuplicate = false;
+
       try {
-        await db.collection("contactSubmissions").doc(submissionId).set({
-          id: submissionId,
-          name,
-          email,
-          phoneNumber: phoneNumber || null,
-          message,
-          submissionHash,
-          clientIp,
-          userAgent: userAgent.slice(0, 200),
-          createdAt: FieldValue.serverTimestamp(),
-          createdAtIso,
-          status: "new",
-          emailNotification: {
-            status: "pending",
-            attemptedAt: null,
-            sentAt: null,
-            messageId: null,
-            errorCode: null,
-            error: null,
-          },
-          whatsappNotification: {
-            status: "pending",
-            attemptedAt: null,
-            sentAt: null,
-            messageId: null,
-            errorCode: null,
-            error: null,
-          },
+        await db.runTransaction(async (transaction) => {
+          const lockDoc = await transaction.get(idempotencyRef);
+          if (lockDoc.exists) {
+            const data = lockDoc.data();
+            const expiresAtMs = typeof data?.expiresAtMs === "number" ? data.expiresAtMs : 0;
+            if (nowMs < expiresAtMs) {
+              isConcurrentDuplicate = true;
+              return;
+            }
+          }
+
+          transaction.set(idempotencyRef, {
+            submissionId,
+            submissionHash,
+            createdAtMs: nowMs,
+            expiresAtMs: nowMs + 5 * 60 * 1000,
+          });
+
+          transaction.set(submissionRef, {
+            id: submissionId,
+            name,
+            email,
+            phoneNumber: phoneNumber || null,
+            message,
+            submissionHash,
+            clientIp,
+            userAgent: userAgent.slice(0, 200),
+            createdAt: FieldValue.serverTimestamp(),
+            createdAtIso,
+            status: "new",
+            emailNotification: {
+              status: "pending",
+              attemptedAt: null,
+              sentAt: null,
+              messageId: null,
+              errorCode: null,
+              error: null,
+            },
+            whatsappNotification: {
+              status: "pending",
+              attemptedAt: null,
+              sentAt: null,
+              messageId: null,
+              errorCode: null,
+              error: null,
+            },
+          });
         });
+
+        if (isConcurrentDuplicate) {
+          return NextResponse.json({
+            success: true,
+            message: "Your message has already been received. Thank you!",
+          });
+        }
       } catch (writeErr) {
         console.error(
           "[Contact Form] Permanent Firestore write failed in production:",

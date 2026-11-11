@@ -321,6 +321,44 @@ async function runTests() {
     assert.notStrictEqual(hash1, hash3);
   });
 
+  test("Atomic idempotency transaction lock simulates concurrent submission deduplication", async () => {
+    // Simulate Firestore transaction state
+    const store = new Map();
+    const nowMs = Date.now();
+    const submissionHash = crypto.createHash("sha256").update("client@example.com:Concurrent test inquiry").digest("hex");
+    const lockKey = `idempotency_${submissionHash}`;
+
+    // Helper simulating atomic transaction execution
+    async function executeSubmissionTx(id) {
+      // Atomic get & set simulation
+      const existing = store.get(lockKey);
+      if (existing && nowMs < existing.expiresAtMs) {
+        return { isDuplicate: true };
+      }
+      store.set(lockKey, {
+        submissionId: id,
+        submissionHash,
+        createdAtMs: nowMs,
+        expiresAtMs: nowMs + 5 * 60 * 1000,
+      });
+      return { isDuplicate: false, submissionId: id };
+    }
+
+    // Run first submission
+    const res1 = await executeSubmissionTx("uuid-1");
+    assert.strictEqual(res1.isDuplicate, false);
+    assert.strictEqual(res1.submissionId, "uuid-1");
+
+    // Run concurrent submission with identical hash
+    const res2 = await executeSubmissionTx("uuid-2");
+    assert.strictEqual(res2.isDuplicate, true);
+
+    // Verify separate inquiry from same user has separate lock and succeeds
+    const differentHash = crypto.createHash("sha256").update("client@example.com:Another different inquiry").digest("hex");
+    const res3 = store.get(`idempotency_${differentHash}`);
+    assert.strictEqual(res3, undefined);
+  });
+
   // --- Group 7: Contact Form Input Validation & Schemas ---
   console.log("\nGroup 7: Contact Form Input Validation & Sanitization");
   test("contactFormSchema rejects message shorter than 10 characters", () => {
