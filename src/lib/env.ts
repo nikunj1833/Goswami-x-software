@@ -73,6 +73,43 @@ export function getFirebaseServerConfig(): FirebaseServerConfig {
   };
 }
 
+export interface EmailConfig {
+  resendApiKey: string;
+  notificationEmail: string;
+  emailFrom: string;
+}
+
+export function getEmailConfig(): EmailConfig {
+  return {
+    resendApiKey: process.env.RESEND_API_KEY || "",
+    notificationEmail: process.env.CONTACT_NOTIFICATION_EMAIL || "",
+    emailFrom: process.env.EMAIL_FROM || "RN Developer <onboarding@resend.dev>",
+  };
+}
+
+export interface WhatsAppNotificationConfig {
+  phoneNumberId: string;
+  accessToken: string;
+  notificationTo: string;
+  templateName: string;
+  templateLanguage: string;
+  graphApiVersion: string;
+}
+
+export function getWhatsAppNotificationConfig(): WhatsAppNotificationConfig {
+  return {
+    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
+    accessToken: process.env.WHATSAPP_ACCESS_TOKEN || "",
+    notificationTo:
+      process.env.WHATSAPP_NOTIFICATION_TO ||
+      process.env.ADMIN_NOTIFICATION_PHONE_NUMBER ||
+      "",
+    templateName: process.env.WHATSAPP_TEMPLATE_NAME || "",
+    templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US",
+    graphApiVersion: process.env.WHATSAPP_GRAPH_API_VERSION || "v21.0",
+  };
+}
+
 export interface WhatsAppConfig {
   phoneNumberId: string;
   accessToken: string;

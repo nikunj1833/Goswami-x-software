@@ -1,45 +1,97 @@
 import crypto from "crypto";
-import { getWhatsAppConfig } from "@/lib/env";
+import { getWhatsAppNotificationConfig } from "@/lib/env";
 
-export interface WhatsAppMessageResult {
+export interface WhatsAppNotificationResult {
   success: boolean;
-  messageId?: string;
+  status: "api_accepted" | "failed" | "unconfigured";
+  attemptedAt: string;
+  sentAt?: string | null;
+  messageId?: string | null;
+  errorCode?: string | null;
   error?: string;
-  details?: unknown;
+}
+
+export interface InquiryWhatsAppPayload {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber?: string | null;
+  message: string;
+  createdAtIso: string;
 }
 
 /**
  * Format E.164 phone number (+919876543210) for Meta API (919876543210)
  */
 function formatForMeta(e164: string): string {
-  return e164.replace(/^\+/, "");
+  return e164.replace(/^\+/, "").replace(/[\s-]/g, "");
 }
 
-
 /**
- * Send an admin notification alert via WhatsApp (e.g. for new contact submission)
+ * Sends a real-time WhatsApp inquiry notification to the business owner
+ * using EXCLUSIVELY an approved Meta WhatsApp Business Message Template.
+ * Does NOT use or fall back to freeform text messages.
  */
-export async function sendWhatsAppAdminAlert(
-  adminPhoneNumberE164: string,
-  alertText: string
-): Promise<WhatsAppMessageResult> {
-  const config = getWhatsAppConfig();
+export async function sendInquiryWhatsAppTemplateNotification(
+  inquiry: InquiryWhatsAppPayload
+): Promise<WhatsAppNotificationResult> {
+  const attemptedAt = new Date().toISOString();
+  const config = getWhatsAppNotificationConfig();
 
-  if (!config.phoneNumberId || !config.accessToken || !adminPhoneNumberE164) {
-    return { success: false, error: "WhatsApp credentials or admin number not set." };
+  if (
+    !config.phoneNumberId ||
+    !config.accessToken ||
+    !config.notificationTo ||
+    !config.templateName
+  ) {
+    return {
+      success: false,
+      status: "unconfigured",
+      attemptedAt,
+      error:
+        "Missing required Meta WhatsApp configuration: WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_NOTIFICATION_TO, or WHATSAPP_TEMPLATE_NAME.",
+    };
   }
 
-  const recipient = formatForMeta(adminPhoneNumberE164);
-  const url = `https://graph.facebook.com/v21.0/${config.phoneNumberId}/messages`;
+  const recipient = formatForMeta(config.notificationTo);
+  if (!/^\d{8,15}$/.test(recipient)) {
+    return {
+      success: false,
+      status: "failed",
+      attemptedAt,
+      errorCode: "INVALID_DESTINATION_PHONE",
+      error: `Invalid destination WhatsApp phone number: "${config.notificationTo}". Expected valid E.164 phone number with 8 to 15 digits.`,
+    };
+  }
 
+  const graphVersion = config.graphApiVersion || "v21.0";
+  const url = `https://graph.facebook.com/${graphVersion}/${config.phoneNumberId}/messages`;
+
+  // Standard 6-parameter Meta approved template body
+  // {{1}}: Name, {{2}}: Email, {{3}}: Phone, {{4}}: Message, {{5}}: Submission ID, {{6}}: Timestamp
   const payload = {
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to: recipient,
-    type: "text",
-    text: {
-      preview_url: false,
-      body: alertText,
+    type: "template",
+    template: {
+      name: config.templateName,
+      language: {
+        code: config.templateLanguage || "en_US",
+      },
+      components: [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: inquiry.name.slice(0, 100) },
+            { type: "text", text: inquiry.email.slice(0, 100) },
+            { type: "text", text: (inquiry.phoneNumber || "Not provided").slice(0, 50) },
+            { type: "text", text: inquiry.message.slice(0, 500) },
+            { type: "text", text: inquiry.id },
+            { type: "text", text: inquiry.createdAtIso },
+          ],
+        },
+      ],
     },
   };
 
@@ -51,15 +103,45 @@ export async function sendWhatsAppAdminAlert(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(8000),
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => null);
+
+    if (response.ok && data?.messages?.[0]?.id) {
+      return {
+        success: true,
+        status: "api_accepted",
+        attemptedAt,
+        sentAt: new Date().toISOString(),
+        messageId: data.messages[0].id,
+      };
+    }
+
+    const errorCode = data?.error?.code
+      ? String(data.error.code)
+      : data?.error?.type || `HTTP_${response.status}`;
+    const errorMsg =
+      data?.error?.message ||
+      data?.error?.error_user_msg ||
+      `Meta Graph API HTTP ${response.status}`;
+
     return {
-      success: response.ok,
-      messageId: data?.messages?.[0]?.id,
+      success: false,
+      status: "failed",
+      attemptedAt,
+      errorCode,
+      error: errorMsg,
     };
-  } catch {
-    return { success: false, error: "Failed to send WhatsApp alert." };
+  } catch (err) {
+    const isTimeout = err instanceof Error && err.name === "TimeoutError";
+    return {
+      success: false,
+      status: "failed",
+      attemptedAt,
+      errorCode: isTimeout ? "TIMEOUT" : "NETWORK_ERROR",
+      error: err instanceof Error ? err.message : "Failed to connect to Meta WhatsApp API.",
+    };
   }
 }
 

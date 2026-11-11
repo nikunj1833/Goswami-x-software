@@ -1,34 +1,45 @@
-import { getAdminApp, Timestamp } from "@/lib/firebase/admin";
+import { getAdminApp, hasFirebaseServerCredentials, Timestamp } from "@/lib/firebase/admin";
 
 export interface RateLimitResult {
   allowed: boolean;
   limit: number;
   remaining: number;
   resetInSeconds: number;
+  unavailable?: boolean;
 }
 
-// In-memory fallback if Firestore is unreachable
+// In-memory fallback if Firestore is unreachable (development only)
 const memoryFallback = new Map<string, { count: number; resetAt: number }>();
 
 /**
  * Serverless-compatible rate limiter persisted in Firestore collection 'rateLimits'.
+ * In production (NODE_ENV=production), fails closed if persistent storage is unavailable.
  */
 export async function checkRateLimit(
   key: string,
   limit: number,
   windowSeconds: number
 ): Promise<RateLimitResult> {
+  const isProduction = process.env.NODE_ENV === "production";
   const now = Date.now();
   const windowMs = windowSeconds * 1000;
 
   // Check if Firebase service account or GCP environment credentials are configured
-  const hasServerCredentials = Boolean(
-    (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) ||
-    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-    process.env.K_SERVICE
-  );
+  const hasServerCredentials = hasFirebaseServerCredentials();
 
   if (!hasServerCredentials) {
+    if (isProduction) {
+      console.warn("[RateLimit] Missing Firebase server credentials in production. Failing closed.");
+      return {
+        allowed: false,
+        limit,
+        remaining: 0,
+        resetInSeconds: 0,
+        unavailable: true,
+      };
+    }
+
+    // In-memory fallback permitted in development only
     const entry = memoryFallback.get(key);
     if (!entry || now > entry.resetAt) {
       memoryFallback.set(key, { count: 1, resetAt: now + windowMs });
@@ -107,9 +118,26 @@ export async function checkRateLimit(
       };
     });
   } catch (err) {
-    console.warn("[RateLimit] Firestore rate limit failed, using in-memory fallback:", err);
+    if (isProduction) {
+      console.warn(
+        "[RateLimit] Firestore rate limit failed in production, failing closed:",
+        err instanceof Error ? err.message : err
+      );
+      return {
+        allowed: false,
+        limit,
+        remaining: 0,
+        resetInSeconds: 0,
+        unavailable: true,
+      };
+    }
 
-    // In-memory fallback
+    console.warn(
+      "[RateLimit] Firestore rate limit failed in development, using in-memory fallback:",
+      err instanceof Error ? err.message : err
+    );
+
+    // In-memory fallback permitted in development only
     const entry = memoryFallback.get(key);
     if (!entry || now > entry.resetAt) {
       memoryFallback.set(key, { count: 1, resetAt: now + windowMs });

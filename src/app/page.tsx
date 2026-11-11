@@ -1,5 +1,6 @@
 import HeroSection from "@/components/HeroSection";
 import StatsSection from "@/components/StatsSection";
+import ServicesSection from "@/components/ServicesSection";
 import ApproachSection from "@/components/ApproachSection";
 import WorkSection from "@/components/WorkSection";
 import TechStackSection from "@/components/TechStackSection";
@@ -15,6 +16,7 @@ export default function Home() {
     <main className="relative z-[2] pt-24">
       <HeroSection />
       <StatsSection />
+      <ServicesSection />
       <ApproachSection />
       <WorkSection />
       <TechStackSection />

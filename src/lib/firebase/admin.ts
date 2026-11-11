@@ -7,6 +7,15 @@ let adminApp: App | null = null;
 let adminAuth: Auth | null = null;
 let adminDb: Firestore | null = null;
 
+export function hasFirebaseServerCredentials(): boolean {
+  const config = getFirebaseServerConfig();
+  return Boolean(
+    (config.clientEmail && config.privateKey) ||
+    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+    process.env.K_SERVICE
+  );
+}
+
 export function getAdminApp(): { app: App; auth: Auth; db: Firestore } {
   if (adminApp && adminAuth && adminDb) {
     return { app: adminApp, auth: adminAuth, db: adminDb };

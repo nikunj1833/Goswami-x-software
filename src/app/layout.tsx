@@ -34,7 +34,10 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+const siteUrl = rawSiteUrl
+  ? (rawSiteUrl.startsWith("http") ? rawSiteUrl : `https://${rawSiteUrl}`).replace(/\/+$/, "")
+  : "https://www.rndeveloper.in";
 
 export const viewport: Viewport = {
   themeColor: [
@@ -47,19 +50,23 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "RN Developer — Apps, Games & Software",
+  title: "RN Developer — Android Apps, Mobile & Game Development",
   description:
-    "RN Developer is a software development business focused on mobile applications, games, and web-based software.",
+    "RN Developer is an independent software development business specializing in Android applications, casual mobile games, Play Store publishing guidance, and custom web software.",
   keywords: [
     "RN Developer",
-    "Software Development",
-    "Mobile App Development",
-    "Game Development",
+    "Android app development",
+    "Android app developer India",
+    "Mobile app development services",
+    "Android game development",
+    "Game development",
+    "Google Play Store publishing support",
+    "Play Console publishing guidance",
+    "Website development services",
+    "Custom software development",
     "React Native",
-    "React.js",
     "Kotlin",
-    "Android Developer",
-    "Firebase",
+    "Next.js",
     "TypeScript",
   ],
   authors: [{ name: "RN Developer" }],
@@ -67,19 +74,20 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    title: "RN Developer — Apps, Games & Software",
+    url: siteUrl,
+    title: "RN Developer — Android Apps, Mobile & Game Development",
     description:
-      "Software development business focused on mobile applications, games, and web-based software.",
+      "RN Developer is an independent software development business specializing in Android applications, casual mobile games, Play Store publishing guidance, and custom web software.",
     siteName: "RN Developer",
   },
   twitter: {
     card: "summary_large_image",
-    title: "RN Developer — Apps, Games & Software",
+    title: "RN Developer — Android Apps, Mobile & Game Development",
     description:
-      "Software development business focused on mobile applications, games, and web-based software.",
+      "RN Developer is an independent software development business specializing in Android applications, casual mobile games, Play Store publishing guidance, and custom web software.",
   },
-  metadataBase: siteUrl ? new URL(siteUrl) : undefined,
-  alternates: siteUrl ? { canonical: "/" } : undefined,
+  metadataBase: new URL(siteUrl),
+  alternates: { canonical: "/" },
   robots: {
     index: true,
     follow: true,

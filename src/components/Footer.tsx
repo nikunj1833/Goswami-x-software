@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import FooterWordmark from "./FooterWordmark";
 
 export default function Footer() {
@@ -26,20 +27,20 @@ export default function Footer() {
           style={{ borderColor: "var(--line)" }}
         >
           <div className="max-w-sm">
-            <a href="#top" className="logo-mark font-serif text-2xl" style={{ color: "var(--fg)" }}>
+            <Link href="/" className="logo-mark font-serif text-2xl" style={{ color: "var(--fg)" }}>
               RN <span className="gradient-text italic">Developer</span>
-            </a>
+            </Link>
             <p className="mt-4 text-sm leading-relaxed" style={{ color: "var(--fg-soft)" }}>
               Software development focused on mobile applications, games, and web-based software.
             </p>
-            <a
-              href="#contact"
+            <Link
+              href="/contact"
               className="btn-primary mt-6 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium"
               style={{ color: "var(--bg)" }}
             >
               Discuss a project
               <span aria-hidden="true">→</span>
-            </a>
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 gap-10 place-items-center sm:grid-cols-2 sm:place-items-start">
@@ -52,29 +53,29 @@ export default function Footer() {
               </p>
               <ul className="mt-4 space-y-2.5 text-sm" style={{ color: "var(--fg-soft)" }}>
                 <li>
-                  <a href="#work" className="nav-link transition-colors hover:opacity-100">
-                    Work
-                  </a>
+                  <Link href="/" className="nav-link transition-colors hover:opacity-100">
+                    Home
+                  </Link>
                 </li>
                 <li>
-                  <a href="#stack" className="nav-link transition-colors hover:opacity-100">
-                    Stack
-                  </a>
-                </li>
-                <li>
-                  <a href="#about" className="nav-link transition-colors hover:opacity-100">
+                  <Link href="/about" className="nav-link transition-colors hover:opacity-100">
                     About
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#experience" className="nav-link transition-colors hover:opacity-100">
-                    Journey
-                  </a>
+                  <Link href="/services" className="nav-link transition-colors hover:opacity-100">
+                    Services
+                  </Link>
                 </li>
                 <li>
-                  <a href="#contact" className="nav-link transition-colors hover:opacity-100">
+                  <Link href="/portfolio" className="nav-link transition-colors hover:opacity-100">
+                    Portfolio
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/contact" className="nav-link transition-colors hover:opacity-100">
                     Contact
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>
@@ -180,21 +181,21 @@ export default function Footer() {
           <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-5">
             <p>© 2026 RN Developer. All rights reserved.</p>
             <div className="flex items-center gap-3 text-[11px]">
-              <a
+              <Link
                 href="/privacy-policy"
                 className="transition-colors hover:opacity-100"
                 style={{ color: "var(--fg-soft)" }}
               >
                 Privacy Policy
-              </a>
+              </Link>
               <span style={{ color: "var(--line)" }}>•</span>
-              <a
+              <Link
                 href="/terms"
                 className="transition-colors hover:opacity-100"
                 style={{ color: "var(--fg-soft)" }}
               >
                 Terms of Service
-              </a>
+              </Link>
             </div>
           </div>
           <button

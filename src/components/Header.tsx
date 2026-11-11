@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
 import { useAuth } from "@/context/AuthContext";
 
@@ -8,6 +9,7 @@ export default function Header() {
   const headerRef = useRef<HTMLElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, authError, clearAuthError, openAuth, signOut } = useAuth();
 
   const getAvatarInitial = useCallback((): string => {
@@ -112,71 +114,62 @@ export default function Header() {
         aria-label="Main Navigation"
         className="mx-auto flex max-w-[72rem] items-center justify-between px-6 py-5 md:px-10"
       >
-        <a
-          href="#top"
+        <Link
+          href="/"
           className="logo-mark font-serif text-[1.15rem] sm:text-2xl md:text-[1.7rem]"
           style={{ color: "var(--fg)" }}
         >
           RN <span className="gradient-text italic">Developer</span>
-        </a>
+        </Link>
 
         <ul
-          className="hidden items-center gap-9 text-sm md:flex"
+          className="hidden items-center gap-8 text-sm md:flex"
           style={{ color: "var(--fg-soft)" }}
         >
           <li>
-            <a
-              href="#work"
+            <Link
+              href="/"
               className="nav-link transition-colors hover:opacity-100"
               style={{ color: "var(--fg-soft)" }}
             >
-              Work
-            </a>
+              Home
+            </Link>
           </li>
           <li>
-            <a
-              href="#stack"
-              className="nav-link transition-colors"
-              style={{ color: "var(--fg-soft)" }}
-            >
-              Stack
-            </a>
-          </li>
-          <li>
-            <a
-              href="#approach"
-              className="nav-link transition-colors"
-              style={{ color: "var(--fg-soft)" }}
-            >
-              Approach
-            </a>
-          </li>
-          <li>
-            <a
-              href="#about"
-              className="nav-link transition-colors"
+            <Link
+              href="/about"
+              className="nav-link transition-colors hover:opacity-100"
               style={{ color: "var(--fg-soft)" }}
             >
               About
-            </a>
+            </Link>
           </li>
           <li>
-            <a
-              href="#faq"
-              className="nav-link transition-colors"
+            <Link
+              href="/services"
+              className="nav-link transition-colors hover:opacity-100"
               style={{ color: "var(--fg-soft)" }}
             >
-              FAQ
-            </a>
+              Services
+            </Link>
           </li>
           <li>
-            <a
-              href="#contact"
-              className="nav-link transition-colors"
+            <Link
+              href="/portfolio"
+              className="nav-link transition-colors hover:opacity-100"
+              style={{ color: "var(--fg-soft)" }}
+            >
+              Portfolio
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/contact"
+              className="nav-link transition-colors hover:opacity-100"
               style={{ color: "var(--fg-soft)" }}
             >
               Contact
-            </a>
+            </Link>
           </li>
         </ul>
 
@@ -317,15 +310,104 @@ export default function Header() {
 
           <ThemeToggle />
 
-          <a
-            href="#contact"
+          <Link
+            href="/contact"
             className="btn-primary hidden rounded-full px-4 py-2 text-sm font-medium sm:inline-block"
             style={{ color: "var(--bg)" }}
           >
             Get in touch
-          </a>
+          </Link>
+
+          {/* Mobile menu toggle button */}
+          <button
+            type="button"
+            className="flex h-9 w-9 items-center justify-center rounded-full border md:hidden transition-colors cursor-pointer"
+            style={{ borderColor: "var(--line)", color: "var(--fg)" }}
+            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+            aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={isMobileMenuOpen}
+          >
+            {isMobileMenuOpen ? (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
         </div>
       </nav>
+
+      {/* Mobile navigation drawer */}
+      {isMobileMenuOpen && (
+        <div
+          className="border-b px-6 py-4 md:hidden backdrop-blur-xl animate-in fade-in"
+          style={{
+            borderColor: "var(--line)",
+            backgroundColor: "color-mix(in srgb, var(--bg-soft) 95%, transparent)",
+          }}
+        >
+          <ul className="flex flex-col gap-3 text-sm" style={{ color: "var(--fg)" }}>
+            <li>
+              <Link
+                href="/"
+                className="block py-2 font-medium transition-colors hover:text-[var(--accent)]"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Home
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/about"
+                className="block py-2 font-medium transition-colors hover:text-[var(--accent)]"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                About
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/services"
+                className="block py-2 font-medium transition-colors hover:text-[var(--accent)]"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Services
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/portfolio"
+                className="block py-2 font-medium transition-colors hover:text-[var(--accent)]"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Portfolio
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/contact"
+                className="block py-2 font-medium transition-colors hover:text-[var(--accent)]"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Contact
+              </Link>
+            </li>
+            <li className="pt-2 sm:hidden">
+              <Link
+                href="/contact"
+                className="btn-primary inline-flex w-full items-center justify-center rounded-full py-2.5 text-center text-sm font-medium"
+                style={{ color: "var(--bg)" }}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Get in touch
+              </Link>
+            </li>
+          </ul>
+        </div>
+      )}
 
       {/* Visible alert banner if OAuth provider or callback returns an error */}
       {authError && (

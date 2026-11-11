@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function WorkSection() {
   return (
     <section id="work" className="border-t" style={{ borderColor: "var(--line)" }}>
@@ -453,6 +455,30 @@ export default function WorkSection() {
               </span>
             </div>
             <div className="stack-divider mt-7" style={{ background: "#F3902B" }} />
+          </div>
+        </div>
+
+        {/* Portfolio Page Link Banner */}
+        <div
+          className="reveal mt-12 flex flex-col sm:flex-row items-center justify-between gap-6 rounded-2xl border p-6 sm:p-8 text-center sm:text-left"
+          style={{ backgroundColor: "var(--bg-soft)", borderColor: "var(--line)" }}
+        >
+          <div>
+            <h3 className="font-serif text-xl sm:text-2xl" style={{ color: "var(--fg)" }}>
+              Want to see detailed technical highlights of all projects?
+            </h3>
+            <p className="mt-1 text-sm leading-relaxed max-w-xl" style={{ color: "var(--fg-soft)" }}>
+              Explore our dedicated portfolio page featuring architectural breakdowns of mobile apps, Kotlin background utilities, and responsive web platforms.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <Link
+              href="/portfolio"
+              className="btn-primary rounded-full px-5 py-2.5 text-xs sm:text-sm font-medium"
+              style={{ color: "var(--bg)" }}
+            >
+              Explore Full Portfolio →
+            </Link>
           </div>
         </div>
       </div>

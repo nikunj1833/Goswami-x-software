@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function HeroSection() {
   return (
     <section
@@ -14,7 +16,7 @@ export default function HeroSection() {
           className="dot-pulse mr-2 inline-block h-2 w-2 rounded-full align-middle"
           style={{ backgroundColor: "var(--accent)" }}
         />
-        Software Development · Apps & Games
+        Software Development · Mobile Apps, Games &amp; Web
       </p>
 
       <h1
@@ -33,10 +35,11 @@ export default function HeroSection() {
       </h1>
 
       <p
-        className="hero-line relative mt-8 max-w-[38rem] text-lg leading-relaxed"
+        className="hero-line relative mt-8 max-w-[42rem] text-lg sm:text-xl leading-relaxed"
         style={{ color: "var(--fg-soft)", animationDelay: ".56s" }}
       >
-        RN Developer is a software development business focused on mobile applications, games, and web-based software.
+        Independent software development business specializing in high-performance Android applications, casual mobile games,
+        Google Play Store publishing support, and modern custom web software.
       </p>
 
       <div
@@ -50,13 +53,42 @@ export default function HeroSection() {
         >
           View selected work
         </a>
+        <Link
+          href="/services"
+          className="rounded-full border px-6 py-3 text-sm font-medium transition-colors hover:bg-[var(--line)]"
+          style={{ borderColor: "var(--line)", color: "var(--fg)" }}
+        >
+          Explore services
+        </Link>
         <a
           href="#contact"
-          className="text-sm underline underline-offset-4 transition-colors"
+          className="text-sm underline underline-offset-4 transition-colors hover:text-[var(--accent)]"
           style={{ color: "var(--fg-soft)", textDecorationColor: "var(--line)" }}
         >
           Let&apos;s talk
         </a>
+      </div>
+
+      {/* Trust & capability tags */}
+      <div
+        className="hero-line relative mt-12 flex flex-wrap items-center gap-2 font-mono text-xs"
+        style={{ color: "var(--fg-soft)", animationDelay: ".85s" }}
+      >
+        <span className="rounded-full border px-3 py-1" style={{ borderColor: "var(--line)", backgroundColor: "var(--bg-soft)" }}>
+          Android Kotlin
+        </span>
+        <span className="rounded-full border px-3 py-1" style={{ borderColor: "var(--line)", backgroundColor: "var(--bg-soft)" }}>
+          React Native
+        </span>
+        <span className="rounded-full border px-3 py-1" style={{ borderColor: "var(--line)", backgroundColor: "var(--bg-soft)" }}>
+          Android Games
+        </span>
+        <span className="rounded-full border px-3 py-1" style={{ borderColor: "var(--line)", backgroundColor: "var(--bg-soft)" }}>
+          Play Console Release
+        </span>
+        <span className="rounded-full border px-3 py-1" style={{ borderColor: "var(--line)", backgroundColor: "var(--bg-soft)" }}>
+          Next.js &amp; TypeScript
+        </span>
       </div>
     </section>
   );

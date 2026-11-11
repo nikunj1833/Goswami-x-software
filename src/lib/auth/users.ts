@@ -1,4 +1,4 @@
-import { getAdminApp } from "@/lib/firebase/admin";
+import { getAdminApp, hasFirebaseServerCredentials } from "@/lib/firebase/admin";
 
 export interface UserProfile {
   id: string;
@@ -94,11 +94,7 @@ export async function authenticateServerRequest(
     };
 
     // Check if Firebase service account or GCP environment credentials are configured
-    const hasServerCredentials = Boolean(
-      (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) ||
-      process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-      process.env.K_SERVICE
-    );
+    const hasServerCredentials = hasFirebaseServerCredentials();
 
     if (hasServerCredentials) {
       try {

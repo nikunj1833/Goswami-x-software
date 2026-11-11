@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 export default function ScrollRevealObserver() {
+  const pathname = usePathname();
+
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       document.querySelectorAll(".reveal").forEach((el) => {
@@ -20,7 +23,7 @@ export default function ScrollRevealObserver() {
           }
         });
       },
-      { threshold: 0.15, rootMargin: "0px 0px -60px 0px" }
+      { threshold: 0.1, rootMargin: "0px 0px 50px 0px" }
     );
 
     const observeElements = () => {
@@ -31,13 +34,13 @@ export default function ScrollRevealObserver() {
     observeElements();
 
     // Re-check shortly after initial render in case of dynamic layout settling
-    const timer = setTimeout(observeElements, 500);
+    const timer = setTimeout(observeElements, 400);
 
     return () => {
       clearTimeout(timer);
       io.disconnect();
     };
-  }, []);
+  }, [pathname]);
 
   return null;
 }

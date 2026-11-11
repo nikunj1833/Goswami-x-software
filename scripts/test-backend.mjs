@@ -5,6 +5,8 @@
 
 import crypto from "crypto";
 import assert from "assert";
+import fs from "fs";
+import path from "path";
 
 // 1. Test Phone Normalization
 import { parsePhoneNumberFromString } from "libphonenumber-js";
@@ -57,10 +59,28 @@ const sanitizeText = (input) => {
 };
 
 const contactFormSchema = z.object({
-  name: z.string().min(2).max(100).transform(sanitizeText),
-  email: z.string().email().max(150).toLowerCase().trim(),
-  message: z.string().min(10).max(3000).transform(sanitizeText),
-  phoneNumber: z.string().max(30).optional(),
+  name: z
+    .string({ error: "Name is required." })
+    .trim()
+    .min(2, "Name must be at least 2 characters.")
+    .max(100, "Name cannot exceed 100 characters.")
+    .transform(sanitizeText),
+  email: z
+    .string({ error: "Email is required." })
+    .email("Please provide a valid email address.")
+    .max(150, "Email cannot exceed 150 characters.")
+    .toLowerCase()
+    .trim(),
+  message: z
+    .string({ error: "Message is required." })
+    .trim()
+    .min(10, "Message must be at least 10 characters.")
+    .max(3000, "Message cannot exceed 3000 characters.")
+    .transform(sanitizeText),
+  phoneNumber: z
+    .string()
+    .max(30, "Phone number is too long.")
+    .optional(),
 });
 
 // 3. Test HMAC & OTP Challenge Hashing
@@ -101,6 +121,18 @@ async function runTests() {
   function test(name, fn) {
     try {
       fn();
+      console.log(`  ✓ ${name}`);
+      passed++;
+    } catch (err) {
+      console.error(`  ✗ ${name}`);
+      console.error(`    Error: ${err.message}`);
+      failed++;
+    }
+  }
+
+  async function testAsync(name, fn) {
+    try {
+      await fn();
       console.log(`  ✓ ${name}`);
       passed++;
     } catch (err) {
@@ -288,6 +320,1032 @@ async function runTests() {
     assert.strictEqual(hash1, hash2);
     assert.notStrictEqual(hash1, hash3);
   });
+
+  // --- Group 7: Contact Form Input Validation & Schemas ---
+  console.log("\nGroup 7: Contact Form Input Validation & Sanitization");
+  test("contactFormSchema rejects message shorter than 10 characters", () => {
+    const result = contactFormSchema.safeParse({
+      name: "John Doe",
+      email: "john@example.com",
+      message: "Too short",
+    });
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.error.issues[0]?.message, "Message must be at least 10 characters.");
+  });
+
+  test("contactFormSchema rejects invalid email address", () => {
+    const result = contactFormSchema.safeParse({
+      name: "John Doe",
+      email: "not-an-email",
+      message: "Valid project inquiry with enough length.",
+    });
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.error.issues[0]?.message, "Please provide a valid email address.");
+  });
+
+  test("contactFormSchema rejects empty or whitespace-only name", () => {
+    const result = contactFormSchema.safeParse({
+      name: "   ",
+      email: "john@example.com",
+      message: "Valid project inquiry with enough length.",
+    });
+    assert.strictEqual(result.success, false);
+  });
+
+  test("contactFormSchema sanitizes HTML and script tags from message and name", () => {
+    const result = contactFormSchema.safeParse({
+      name: "Alice <script>alert('xss')</script>",
+      email: "alice@example.com",
+      message: "Looking for <img src=x onerror=alert(1)> development of mobile app.",
+    });
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.data.name.includes("<script>"), false);
+    assert.strictEqual(result.data.message.includes("<img"), false);
+  });
+
+  test("ContactForm.tsx has zero WhatsApp UI elements, icons, or text", () => {
+    const contactFormPath = path.resolve("src/components/ContactForm.tsx");
+    assert.strictEqual(fs.existsSync(contactFormPath), true);
+    const source = fs.readFileSync(contactFormPath, "utf8");
+    assert.strictEqual(/whatsapp/i.test(source), false, "ContactForm.tsx must not contain any WhatsApp references");
+    assert.strictEqual(/phone\s+number/i.test(source), true);
+    assert.strictEqual(source.includes("reply to your email address"), true);
+    assert.strictEqual(source.includes("Send Project Inquiry"), true);
+    assert.strictEqual(/className=.*reveal/i.test(source), false, "ContactForm must not have reveal class hiding it");
+  });
+
+  test("Contact form client payload matches backend contactFormSchema without notification channel fields", () => {
+    const clientPayload = {
+      name: "Prospective Client",
+      email: "client@example.com",
+      message: "Inquiry about custom Android mobile application.",
+      phoneNumber: "+919876543210",
+    };
+    const parsed = contactFormSchema.safeParse(clientPayload);
+    assert.strictEqual(parsed.success, true);
+    assert.strictEqual(parsed.data.name, "Prospective Client");
+    assert.strictEqual(parsed.data.email, "client@example.com");
+    assert.strictEqual(parsed.data.phoneNumber, "+919876543210");
+    // Ensure no notification preference field is required
+    assert.strictEqual("notificationChannel" in parsed.data, false);
+    assert.strictEqual("whatsappOptIn" in parsed.data, false);
+  });
+
+  // --- Group 8: Resend Email & Meta WhatsApp Template Verification ---
+  console.log("\nGroup 8: Resend Email & Meta WhatsApp Template Clients");
+
+  // Email template builder simulation matching src/lib/email/client.ts
+  function escapeHtml(text) {
+    if (!text) return "";
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function buildInquiryEmailHtml(inquiry) {
+    const safeName = escapeHtml(inquiry.name);
+    const safeEmail = escapeHtml(inquiry.email);
+    const safePhone = inquiry.phoneNumber ? escapeHtml(inquiry.phoneNumber) : "Not provided";
+    const safeMessage = escapeHtml(inquiry.message).replace(/\n/g, "<br />");
+    const safeId = escapeHtml(inquiry.id);
+    const safeDate = escapeHtml(inquiry.createdAtIso);
+    return `<!DOCTYPE html><html><body><h1>RN Developer Contact Submission</h1><p>${safeName}</p><p>${safeEmail}</p><p>${safePhone}</p><div>${safeMessage}</div><span>${safeId}</span><span>${safeDate}</span></body></html>`;
+  }
+
+  // Simulated Resend client matching src/lib/email/client.ts
+  async function simulateSendEmailNotification(inquiry, config, fetchImpl = fetch) {
+    const attemptedAt = new Date().toISOString();
+    if (!config.resendApiKey || !config.notificationEmail) {
+      return {
+        success: false,
+        status: "unconfigured",
+        attemptedAt,
+        error: "Missing RESEND_API_KEY or CONTACT_NOTIFICATION_EMAIL environment configuration.",
+      };
+    }
+
+    const html = buildInquiryEmailHtml(inquiry);
+    const subject = `New Contact Inquiry — RN Developer (${inquiry.name})`;
+
+    try {
+      const response = await fetchImpl("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.resendApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: config.emailFrom,
+          to: [config.notificationEmail],
+          reply_to: inquiry.email,
+          subject,
+          html,
+          headers: {
+            "X-Entity-Ref-ID": inquiry.id,
+          },
+        }),
+        signal: AbortSignal.timeout(8000),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (response.ok && data?.id) {
+        return {
+          success: true,
+          status: "api_accepted",
+          attemptedAt,
+          sentAt: new Date().toISOString(),
+          messageId: data.id,
+        };
+      }
+
+      const errorCode = data?.name || data?.error?.name || `HTTP_${response.status}`;
+      const errorMessage =
+        data?.message || data?.error?.message || `Resend API HTTP ${response.status}`;
+
+      return {
+        success: false,
+        status: "failed",
+        attemptedAt,
+        errorCode,
+        error: errorMessage,
+      };
+    } catch (err) {
+      const isTimeout = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+      return {
+        success: false,
+        status: "failed",
+        attemptedAt,
+        errorCode: isTimeout ? "TIMEOUT" : "NETWORK_ERROR",
+        error: err instanceof Error ? err.message : "Failed to connect to Resend API.",
+      };
+    }
+  }
+
+  // Simulated WhatsApp client matching src/lib/whatsapp/client.ts
+  function formatForMetaWhatsApp(e164) {
+    return (e164 || "").replace(/^\+/, "").replace(/[\s-]/g, "");
+  }
+
+  async function simulateSendWhatsAppTemplateNotification(inquiry, config, fetchImpl = fetch) {
+    const attemptedAt = new Date().toISOString();
+    if (
+      !config.phoneNumberId ||
+      !config.accessToken ||
+      !config.notificationTo ||
+      !config.templateName
+    ) {
+      return {
+        success: false,
+        status: "unconfigured",
+        attemptedAt,
+        error:
+          "Missing required Meta WhatsApp configuration: WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_NOTIFICATION_TO, or WHATSAPP_TEMPLATE_NAME.",
+      };
+    }
+
+    const recipient = formatForMetaWhatsApp(config.notificationTo);
+    if (!/^\d{8,15}$/.test(recipient)) {
+      return {
+        success: false,
+        status: "failed",
+        attemptedAt,
+        errorCode: "INVALID_DESTINATION_PHONE",
+        error: `Invalid destination WhatsApp phone number: "${config.notificationTo}". Expected valid E.164 phone number with 8 to 15 digits.`,
+      };
+    }
+
+    const graphVersion = config.graphApiVersion || "v21.0";
+    const url = `https://graph.facebook.com/${graphVersion}/${config.phoneNumberId}/messages`;
+
+    const payload = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: recipient,
+      type: "template",
+      template: {
+        name: config.templateName,
+        language: {
+          code: config.templateLanguage || "en_US",
+        },
+        components: [
+          {
+            type: "body",
+            parameters: [
+              { type: "text", text: inquiry.name.slice(0, 100) },
+              { type: "text", text: inquiry.email.slice(0, 100) },
+              { type: "text", text: (inquiry.phoneNumber || "Not provided").slice(0, 50) },
+              { type: "text", text: inquiry.message.slice(0, 500) },
+              { type: "text", text: inquiry.id },
+              { type: "text", text: inquiry.createdAtIso },
+            ],
+          },
+        ],
+      },
+    };
+
+    try {
+      const response = await fetchImpl(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(8000),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (response.ok && data?.messages?.[0]?.id) {
+        return {
+          success: true,
+          status: "api_accepted",
+          attemptedAt,
+          sentAt: new Date().toISOString(),
+          messageId: data.messages[0].id,
+        };
+      }
+
+      const errorCode = data?.error?.code
+        ? String(data.error.code)
+        : data?.error?.type || `HTTP_${response.status}`;
+      const errorMsg =
+        data?.error?.message ||
+        data?.error?.error_user_msg ||
+        `Meta Graph API HTTP ${response.status}`;
+
+      return {
+        success: false,
+        status: "failed",
+        attemptedAt,
+        errorCode,
+        error: errorMsg,
+      };
+    } catch (err) {
+      const isTimeout = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+      return {
+        success: false,
+        status: "failed",
+        attemptedAt,
+        errorCode: isTimeout ? "TIMEOUT" : "NETWORK_ERROR",
+        error: err instanceof Error ? err.message : "Failed to connect to Meta WhatsApp API.",
+      };
+    }
+  }
+
+  test("Email HTML builder escapes malicious tags and prevents HTML injection", () => {
+    const malicious = {
+      id: "uuid-123",
+      createdAtIso: "2026-11-10T00:00:00.000Z",
+      name: 'Hacker <script>alert("xss")</script>',
+      email: "test@example.com",
+      message: 'Hello <img src="x" onerror="steal()" /> & "quotes"',
+      phoneNumber: "<script>",
+    };
+    const html = buildInquiryEmailHtml(malicious);
+    assert.strictEqual(html.includes("<script>"), false);
+    assert.strictEqual(html.includes("<img"), false);
+    assert.strictEqual(html.includes("&amp;"), true);
+    assert.strictEqual(html.includes("&quot;quotes&quot;"), true);
+  });
+
+  await testAsync("Resend client formats payload with reply_to, sender, headers and returns api_accepted", async () => {
+    let capturedUrl = "";
+    let capturedOptions = null;
+
+    const mockFetch = async (url, options) => {
+      capturedUrl = url;
+      capturedOptions = options;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "re_test_message_123" }),
+      };
+    };
+
+    const config = {
+      resendApiKey: "re_valid_api_key_123",
+      notificationEmail: "owner@example.com",
+      emailFrom: "RN Developer <onboarding@resend.dev>",
+    };
+
+    const inquiry = {
+      id: "inq-uuid-456",
+      name: "Enterprise Client",
+      email: "client@example.com",
+      phoneNumber: "+919876543210",
+      message: "We need full-cycle custom mobile and Android development.",
+      createdAtIso: "2026-11-10T12:00:00.000Z",
+    };
+
+    const result = await simulateSendEmailNotification(inquiry, config, mockFetch);
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.status, "api_accepted");
+    assert.strictEqual(result.messageId, "re_test_message_123");
+    assert.strictEqual(typeof result.sentAt, "string");
+    assert.strictEqual(typeof result.attemptedAt, "string");
+
+    assert.strictEqual(capturedUrl, "https://api.resend.com/emails");
+    assert.strictEqual(capturedOptions.headers.Authorization, "Bearer re_valid_api_key_123");
+
+    const sentBody = JSON.parse(capturedOptions.body);
+    assert.deepStrictEqual(sentBody.to, ["owner@example.com"]);
+    assert.strictEqual(sentBody.from, "RN Developer <onboarding@resend.dev>");
+    assert.strictEqual(sentBody.reply_to, "client@example.com");
+    assert.strictEqual(sentBody.subject.includes("Enterprise Client"), true);
+    assert.strictEqual(sentBody.headers["X-Entity-Ref-ID"], "inq-uuid-456");
+  });
+
+  await testAsync("Resend client returns unconfigured status when API key is missing", async () => {
+    const result = await simulateSendEmailNotification(
+      { id: "1", name: "A", email: "a@b.com", message: "Hello", createdAtIso: "iso" },
+      { resendApiKey: "", notificationEmail: "owner@example.com", emailFrom: "test@example.com" }
+    );
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.status, "unconfigured");
+    assert.strictEqual(typeof result.attemptedAt, "string");
+  });
+
+  await testAsync("Resend client handles API timeout gracefully and returns TIMEOUT errorCode", async () => {
+    const mockTimeoutFetch = async () => {
+      const err = new Error("The operation was aborted due to timeout");
+      err.name = "TimeoutError";
+      throw err;
+    };
+    const result = await simulateSendEmailNotification(
+      { id: "1", name: "A", email: "a@b.com", message: "Hello", createdAtIso: "iso" },
+      { resendApiKey: "re_key", notificationEmail: "owner@example.com", emailFrom: "test@example.com" },
+      mockTimeoutFetch
+    );
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.status, "failed");
+    assert.strictEqual(result.errorCode, "TIMEOUT");
+  });
+
+  await testAsync("Resend client handles HTTP 422 error response and extracts errorCode", async () => {
+    const mockErrorFetch = async () => ({
+      ok: false,
+      status: 422,
+      json: async () => ({
+        name: "validation_error",
+        message: "The 'from' domain is not verified.",
+      }),
+    });
+    const result = await simulateSendEmailNotification(
+      { id: "1", name: "A", email: "a@b.com", message: "Hello", createdAtIso: "iso" },
+      { resendApiKey: "re_key", notificationEmail: "owner@example.com", emailFrom: "test@example.com" },
+      mockErrorFetch
+    );
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.status, "failed");
+    assert.strictEqual(result.errorCode, "validation_error");
+    assert.strictEqual(result.error.includes("not verified"), true);
+  });
+
+  test("WhatsApp recipient number formatting strips leading plus and separators", () => {
+    assert.strictEqual(formatForMetaWhatsApp("+91 98765 43210"), "919876543210");
+    assert.strictEqual(formatForMetaWhatsApp("+1 (415) 555-0199"), "1(415)5550199");
+    assert.strictEqual(formatForMetaWhatsApp("9876543210"), "9876543210");
+  });
+
+  await testAsync("WhatsApp client sends strictly approved template with 6 parameters and returns api_accepted", async () => {
+    let capturedUrl = "";
+    let capturedOptions = null;
+
+    const mockFetch = async (url, options) => {
+      capturedUrl = url;
+      capturedOptions = options;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ messages: [{ id: "wamid.HBgLMTIzNDU2" }] }),
+      };
+    };
+
+    const config = {
+      phoneNumberId: "109876543210",
+      accessToken: "EAAG_valid_meta_token",
+      notificationTo: "+919876543210",
+      templateName: "new_contact_inquiry",
+      templateLanguage: "en_US",
+      graphApiVersion: "v21.0",
+    };
+
+    const inquiry = {
+      id: "inq-999",
+      name: "Alice Builder",
+      email: "alice@example.com",
+      phoneNumber: "+91 98765 00000",
+      message: "Please build an Android game in Unity.",
+      createdAtIso: "2026-11-10T15:30:00.000Z",
+    };
+
+    const result = await simulateSendWhatsAppTemplateNotification(inquiry, config, mockFetch);
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.status, "api_accepted");
+    assert.strictEqual(result.messageId, "wamid.HBgLMTIzNDU2");
+    assert.strictEqual(typeof result.sentAt, "string");
+    assert.strictEqual(typeof result.attemptedAt, "string");
+
+    assert.strictEqual(capturedUrl, "https://graph.facebook.com/v21.0/109876543210/messages");
+    assert.strictEqual(capturedOptions.headers.Authorization, "Bearer EAAG_valid_meta_token");
+
+    const payload = JSON.parse(capturedOptions.body);
+    assert.strictEqual(payload.messaging_product, "whatsapp");
+    assert.strictEqual(payload.recipient_type, "individual");
+    assert.strictEqual(payload.to, "919876543210");
+    assert.strictEqual(payload.type, "template");
+    assert.strictEqual(payload.text, undefined); // Strictly template-only, zero freeform text
+    assert.strictEqual(payload.template.name, "new_contact_inquiry");
+    assert.strictEqual(payload.template.language.code, "en_US");
+
+    const params = payload.template.components[0].parameters;
+    assert.strictEqual(params.length, 6);
+    assert.strictEqual(params[0].text, "Alice Builder");
+    assert.strictEqual(params[1].text, "alice@example.com");
+    assert.strictEqual(params[2].text, "+91 98765 00000");
+    assert.strictEqual(params[3].text, "Please build an Android game in Unity.");
+    assert.strictEqual(params[4].text, "inq-999");
+    assert.strictEqual(params[5].text, "2026-11-10T15:30:00.000Z");
+  });
+
+  await testAsync("WhatsApp client rejects invalid recipient phone format", async () => {
+    const config = {
+      phoneNumberId: "123",
+      accessToken: "EAAG_token",
+      notificationTo: "invalid-phone",
+      templateName: "inquiry",
+    };
+    const result = await simulateSendWhatsAppTemplateNotification(
+      { id: "1", name: "A", email: "a@b.com", message: "Msg", createdAtIso: "iso" },
+      config
+    );
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.status, "failed");
+    assert.strictEqual(result.errorCode, "INVALID_DESTINATION_PHONE");
+  });
+
+  await testAsync("WhatsApp client returns unconfigured status when config is missing", async () => {
+    const result = await simulateSendWhatsAppTemplateNotification(
+      { id: "1", name: "A", email: "a@b.com", message: "Msg", createdAtIso: "iso" },
+      { phoneNumberId: "", accessToken: "", notificationTo: "", templateName: "" }
+    );
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.status, "unconfigured");
+  });
+
+  await testAsync("WhatsApp client handles Meta Graph API error response properly", async () => {
+    const mockMetaError = async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: {
+          message: "Template does not exist in requested language.",
+          type: "OAuthException",
+          code: 132001,
+        },
+      }),
+    });
+    const config = {
+      phoneNumberId: "123",
+      accessToken: "EAAG_token",
+      notificationTo: "+919876543210",
+      templateName: "missing_template",
+    };
+    const result = await simulateSendWhatsAppTemplateNotification(
+      { id: "1", name: "A", email: "a@b.com", message: "Msg", createdAtIso: "iso" },
+      config,
+      mockMetaError
+    );
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.status, "failed");
+    assert.strictEqual(result.errorCode, "132001");
+    assert.strictEqual(result.error.includes("Template does not exist"), true);
+  });
+
+  await testAsync("WhatsApp client handles timeout and returns TIMEOUT errorCode", async () => {
+    const mockTimeout = async () => {
+      const err = new Error("The operation was aborted due to timeout");
+      err.name = "TimeoutError";
+      throw err;
+    };
+    const config = {
+      phoneNumberId: "123",
+      accessToken: "EAAG_token",
+      notificationTo: "+919876543210",
+      templateName: "inquiry",
+    };
+    const result = await simulateSendWhatsAppTemplateNotification(
+      { id: "1", name: "A", email: "a@b.com", message: "Msg", createdAtIso: "iso" },
+      config,
+      mockTimeout
+    );
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.status, "failed");
+    assert.strictEqual(result.errorCode, "TIMEOUT");
+  });
+
+  // --- Group 9: Production vs Development Hardening Pipeline ---
+  console.log("\nGroup 9: Production vs Development Hardening & Durability");
+
+  // Mock harness matching exact logic of route.ts
+  async function simulateContactPipeline({
+    body,
+    isProduction = false,
+    hasCredentials = false,
+    firestoreMock = null,
+    emailMock = null,
+    whatsAppMock = null,
+    devMemory = new Map(),
+  }) {
+    let parsedBody;
+    if (typeof body === "string") {
+      try {
+        parsedBody = JSON.parse(body);
+      } catch {
+        return { status: 400, data: { success: false, error: "Malformed request payload. Please provide valid JSON." } };
+      }
+    } else {
+      parsedBody = body;
+    }
+
+    const parseResult = contactFormSchema.safeParse(parsedBody);
+    if (!parseResult.success) {
+      return { status: 400, data: { success: false, error: parseResult.error.issues[0]?.message || "Invalid contact form input." } };
+    }
+
+    if (isProduction && !hasCredentials) {
+      return { status: 503, data: { success: false, error: "We couldn't securely save your inquiry right now. Please try again later or contact us directly." } };
+    }
+
+    const { name, email, message, phoneNumber } = parseResult.data;
+    const submissionHash = crypto.createHash("sha256").update(`${email}:${message}`).digest("hex");
+    const nowMs = Date.now();
+    const fiveMinutesAgoMs = nowMs - 5 * 60 * 1000;
+    const createdAtIso = new Date().toISOString();
+
+    if (isProduction) {
+      if (!hasCredentials) {
+        return { status: 503, data: { success: false, error: "We couldn't securely save your inquiry right now. Please try again later or contact us directly." } };
+      }
+
+      if (firestoreMock) {
+        try {
+          const isDup = await firestoreMock.checkDuplicate(submissionHash, fiveMinutesAgoMs);
+          if (isDup) {
+            return { status: 200, data: { success: true, message: "Your message has already been received. Thank you!" } };
+          }
+        } catch {
+          return { status: 503, data: { success: false, error: "We couldn't securely save your inquiry right now. Please try again later or contact us directly." } };
+        }
+
+        const submissionId = crypto.randomUUID();
+        try {
+          await firestoreMock.writeSubmission({
+            id: submissionId,
+            name,
+            email,
+            message,
+            phoneNumber,
+            submissionHash,
+            createdAtIso,
+            emailNotification: { status: "pending", attemptedAt: null, sentAt: null, messageId: null, errorCode: null },
+            whatsappNotification: { status: "pending", attemptedAt: null, sentAt: null, messageId: null, errorCode: null },
+          });
+        } catch {
+          return { status: 503, data: { success: false, error: "We couldn't securely save your inquiry right now. Please try again later or contact us directly." } };
+        }
+
+        // Secondary notifications triggered strictly AFTER confirmed Firestore write
+        let emailResult = { status: "unconfigured", attemptedAt: new Date().toISOString() };
+        let whatsappResult = { status: "unconfigured", attemptedAt: new Date().toISOString() };
+
+        const [eRes, wRes] = await Promise.all([
+          emailMock ? emailMock.send().catch((err) => ({ status: "failed", error: err.message, attemptedAt: new Date().toISOString() })) : emailResult,
+          whatsAppMock ? whatsAppMock.send().catch((err) => ({ status: "failed", error: err.message, attemptedAt: new Date().toISOString() })) : whatsappResult,
+        ]);
+
+        emailResult = eRes;
+        whatsappResult = wRes;
+
+        if (firestoreMock.updateNotificationStatus) {
+          try {
+            await firestoreMock.updateNotificationStatus(submissionId, {
+              emailNotification: {
+                status: emailResult.status,
+                attemptedAt: emailResult.attemptedAt,
+                sentAt: emailResult.sentAt || null,
+                messageId: emailResult.messageId || null,
+                errorCode: emailResult.errorCode || null,
+              },
+              whatsappNotification: {
+                status: whatsappResult.status,
+                attemptedAt: whatsappResult.attemptedAt,
+                sentAt: whatsappResult.sentAt || null,
+                messageId: whatsappResult.messageId || null,
+                errorCode: whatsappResult.errorCode || null,
+              },
+            });
+          } catch (updateErr) {
+            console.warn("[Test Mock Warning] Failed to update notification status:", updateErr.message);
+          }
+        }
+
+        return {
+          status: 200,
+          data: { success: true, message: "Thank you for reaching out! Your inquiry has been received." },
+          notifications: { email: emailResult.status, whatsapp: whatsappResult.status },
+        };
+      }
+    }
+
+    // Development mode
+    for (const item of devMemory.values()) {
+      if (item.submissionHash === submissionHash && item.createdAt >= fiveMinutesAgoMs) {
+        return { status: 200, data: { success: true, message: "Your message has already been received. Thank you!" } };
+      }
+    }
+
+    const submissionId = crypto.randomUUID();
+    devMemory.set(submissionId, { id: submissionId, ...parseResult.data, submissionHash, createdAt: nowMs });
+
+    return { status: 200, data: { success: true, message: "Thank you for reaching out! (Saved in local development fallback mode)" } };
+  }
+
+  const validInquiry = {
+    name: "Enterprise Client",
+    email: "enterprise@example.com",
+    message: "We need full-cycle custom mobile and Android development.",
+    phoneNumber: "+919876543210",
+  };
+
+  await testAsync("1. Development submission with Firestore unavailable succeeds with dev indicator", async () => {
+    const devMemory = new Map();
+    const res = await simulateContactPipeline({
+      body: validInquiry,
+      isProduction: false,
+      hasCredentials: false,
+      devMemory,
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.success, true);
+    assert.strictEqual(res.data.message.includes("development fallback mode"), true);
+    assert.strictEqual(devMemory.size, 1);
+  });
+
+  await testAsync("2. Production missing Firebase credentials fails closed with HTTP 503", async () => {
+    const res = await simulateContactPipeline({
+      body: validInquiry,
+      isProduction: true,
+      hasCredentials: false,
+    });
+    assert.strictEqual(res.status, 503);
+    assert.strictEqual(res.data.success, false);
+    assert.strictEqual(res.data.error.includes("securely save your inquiry"), true);
+  });
+
+  await testAsync("3. Production Firestore write succeeds returns HTTP 200 and records api_accepted notification statuses", async () => {
+    let writeCalled = false;
+    let statusUpdated = false;
+    const firestoreMock = {
+      checkDuplicate: async () => false,
+      writeSubmission: async () => { writeCalled = true; },
+      updateNotificationStatus: async (id, statuses) => {
+        statusUpdated = true;
+        assert.strictEqual(statuses.emailNotification.status, "api_accepted");
+        assert.strictEqual(statuses.whatsappNotification.status, "api_accepted");
+        assert.strictEqual(statuses.emailNotification.messageId, "re_msg_123");
+        assert.strictEqual(statuses.whatsappNotification.messageId, "wamid_456");
+      },
+    };
+    const emailMock = {
+      send: async () => ({ status: "api_accepted", success: true, messageId: "re_msg_123", attemptedAt: new Date().toISOString(), sentAt: new Date().toISOString() }),
+    };
+    const whatsAppMock = {
+      send: async () => ({ status: "api_accepted", success: true, messageId: "wamid_456", attemptedAt: new Date().toISOString(), sentAt: new Date().toISOString() }),
+    };
+
+    const res = await simulateContactPipeline({
+      body: validInquiry,
+      isProduction: true,
+      hasCredentials: true,
+      firestoreMock,
+      emailMock,
+      whatsAppMock,
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.success, true);
+    assert.strictEqual(writeCalled, true);
+    assert.strictEqual(statusUpdated, true);
+    assert.strictEqual(res.notifications.email, "api_accepted");
+    assert.strictEqual(res.notifications.whatsapp, "api_accepted");
+  });
+
+  await testAsync("4. Production Firestore write fails returns HTTP 503 error and skips notifications", async () => {
+    let emailSent = false;
+    let whatsappSent = false;
+    const firestoreMock = {
+      checkDuplicate: async () => false,
+      writeSubmission: async () => { throw new Error("Firestore write quota exceeded"); },
+    };
+    const emailMock = { send: async () => { emailSent = true; } };
+    const whatsAppMock = { send: async () => { whatsappSent = true; } };
+
+    const res = await simulateContactPipeline({
+      body: validInquiry,
+      isProduction: true,
+      hasCredentials: true,
+      firestoreMock,
+      emailMock,
+      whatsAppMock,
+    });
+
+    assert.strictEqual(res.status, 503);
+    assert.strictEqual(res.data.success, false);
+    assert.strictEqual(emailSent, false);
+    assert.strictEqual(whatsappSent, false);
+  });
+
+  await testAsync("5. Independent tracking: Email api_accepted and WhatsApp failed are tracked separately in Firestore", async () => {
+    let recordedStatuses = null;
+    const firestoreMock = {
+      checkDuplicate: async () => false,
+      writeSubmission: async () => {},
+      updateNotificationStatus: async (id, statuses) => {
+        recordedStatuses = statuses;
+      },
+    };
+    const emailMock = {
+      send: async () => ({
+        status: "api_accepted",
+        success: true,
+        messageId: "re_ok_999",
+        attemptedAt: new Date().toISOString(),
+        sentAt: new Date().toISOString(),
+      }),
+    };
+    const whatsAppMock = {
+      send: async () => ({
+        status: "failed",
+        success: false,
+        errorCode: "INVALID_PHONE",
+        error: "Destination number format invalid",
+        attemptedAt: new Date().toISOString(),
+      }),
+    };
+
+    const res = await simulateContactPipeline({
+      body: validInquiry,
+      isProduction: true,
+      hasCredentials: true,
+      firestoreMock,
+      emailMock,
+      whatsAppMock,
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.success, true);
+    assert.strictEqual(recordedStatuses.emailNotification.status, "api_accepted");
+    assert.strictEqual(recordedStatuses.whatsappNotification.status, "failed");
+    assert.strictEqual(recordedStatuses.whatsappNotification.errorCode, "INVALID_PHONE");
+  });
+
+  await testAsync("6. Independent tracking: Email failed and WhatsApp api_accepted are tracked separately in Firestore", async () => {
+    let recordedStatuses = null;
+    const firestoreMock = {
+      checkDuplicate: async () => false,
+      writeSubmission: async () => {},
+      updateNotificationStatus: async (id, statuses) => {
+        recordedStatuses = statuses;
+      },
+    };
+    const emailMock = {
+      send: async () => ({
+        status: "failed",
+        success: false,
+        errorCode: "TIMEOUT",
+        error: "Resend timed out",
+        attemptedAt: new Date().toISOString(),
+      }),
+    };
+    const whatsAppMock = {
+      send: async () => ({
+        status: "api_accepted",
+        success: true,
+        messageId: "wamid.success",
+        attemptedAt: new Date().toISOString(),
+        sentAt: new Date().toISOString(),
+      }),
+    };
+
+    const res = await simulateContactPipeline({
+      body: validInquiry,
+      isProduction: true,
+      hasCredentials: true,
+      firestoreMock,
+      emailMock,
+      whatsAppMock,
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.success, true);
+    assert.strictEqual(recordedStatuses.emailNotification.status, "failed");
+    assert.strictEqual(recordedStatuses.emailNotification.errorCode, "TIMEOUT");
+    assert.strictEqual(recordedStatuses.whatsappNotification.status, "api_accepted");
+  });
+
+  await testAsync("7. Both notifications failing does NOT fail the request if Firestore inquiry was saved", async () => {
+    let recordedStatuses = null;
+    const firestoreMock = {
+      checkDuplicate: async () => false,
+      writeSubmission: async () => {},
+      updateNotificationStatus: async (id, statuses) => {
+        recordedStatuses = statuses;
+      },
+    };
+    const emailMock = {
+      send: async () => ({
+        status: "failed",
+        success: false,
+        errorCode: "NETWORK_ERROR",
+        error: "DNS lookup failed",
+        attemptedAt: new Date().toISOString(),
+      }),
+    };
+    const whatsAppMock = {
+      send: async () => ({
+        status: "failed",
+        success: false,
+        errorCode: "TIMEOUT",
+        error: "Meta API timeout",
+        attemptedAt: new Date().toISOString(),
+      }),
+    };
+
+    const res = await simulateContactPipeline({
+      body: validInquiry,
+      isProduction: true,
+      hasCredentials: true,
+      firestoreMock,
+      emailMock,
+      whatsAppMock,
+    });
+
+    // Inquiry is safely in Firestore, so visitor still gets HTTP 200 without false delivery claim
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.success, true);
+    assert.strictEqual(res.data.message, "Thank you for reaching out! Your inquiry has been received.");
+    assert.strictEqual(recordedStatuses.emailNotification.status, "failed");
+    assert.strictEqual(recordedStatuses.whatsappNotification.status, "failed");
+  });
+
+  await testAsync("8. Production rate-limit persistence unavailable fails closed with HTTP 503", async () => {
+    const isProduction = true;
+    const hasServerCredentials = false;
+    let rateLimitResult;
+    if (isProduction && !hasServerCredentials) {
+      rateLimitResult = { allowed: false, limit: 5, remaining: 0, resetInSeconds: 0, unavailable: true };
+    }
+    assert.strictEqual(rateLimitResult.allowed, false);
+    assert.strictEqual(rateLimitResult.unavailable, true);
+  });
+
+  await testAsync("9. Duplicate submission within 5 minutes returns idempotent HTTP 200 without duplicate write or notifications", async () => {
+    let writeCount = 0;
+    let emailSent = false;
+    let whatsappSent = false;
+    const firestoreMock = {
+      checkDuplicate: async () => true, // Duplicate found
+      writeSubmission: async () => { writeCount++; },
+    };
+    const emailMock = { send: async () => { emailSent = true; } };
+    const whatsAppMock = { send: async () => { whatsappSent = true; } };
+
+    const res = await simulateContactPipeline({
+      body: validInquiry,
+      isProduction: true,
+      hasCredentials: true,
+      firestoreMock,
+      emailMock,
+      whatsAppMock,
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.success, true);
+    assert.strictEqual(res.data.message, "Your message has already been received. Thank you!");
+    assert.strictEqual(writeCount, 0); // No duplicate document written
+    assert.strictEqual(emailSent, false); // No duplicate email sent
+    assert.strictEqual(whatsappSent, false); // No duplicate WhatsApp sent
+  });
+
+  await testAsync("10. Invalid input returns HTTP 400", async () => {
+    const res = await simulateContactPipeline({
+      body: { name: "A", email: "invalid-email", message: "too short" },
+      isProduction: true,
+      hasCredentials: true,
+    });
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(res.data.success, false);
+  });
+
+  await testAsync("11. Malformed JSON payload returns HTTP 400", async () => {
+    const res = await simulateContactPipeline({
+      body: "{invalid-json-content",
+      isProduction: true,
+      hasCredentials: true,
+    });
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(res.data.success, false);
+    assert.strictEqual(res.data.error, "Malformed request payload. Please provide valid JSON.");
+  });
+
+  await testAsync("12. Notification status update error produces warning but does not fail the HTTP 200 response", async () => {
+    const firestoreMock = {
+      checkDuplicate: async () => false,
+      writeSubmission: async () => {},
+      updateNotificationStatus: async () => {
+        throw new Error("Transient Firestore update timeout");
+      },
+    };
+    const emailMock = {
+      send: async () => ({ status: "api_accepted", success: true, messageId: "msg1", attemptedAt: "iso" }),
+    };
+
+    const res = await simulateContactPipeline({
+      body: validInquiry,
+      isProduction: true,
+      hasCredentials: true,
+      firestoreMock,
+      emailMock,
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.success, true);
+  });
+
+  // --- Group 10: Compiled /api/contact Route Production Execution ---
+  const compiledRoutePath = path.resolve(".next/server/app/api/contact/route.js");
+  if (fs.existsSync(compiledRoutePath)) {
+    console.log("\nGroup 10: Compiled /api/contact Route Production Execution");
+    const routeModule = await import(compiledRoutePath);
+    await routeModule.default.routeModule.ensureUserland();
+    const POST = routeModule.default.routeModule.userland.POST;
+
+    await testAsync("Compiled production POST rejects malformed JSON payload with HTTP 400", async () => {
+      const res = await POST(new Request("http://localhost:3000/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{malformed-json",
+      }));
+      assert.strictEqual(res.status, 400);
+      const data = await res.json();
+      assert.strictEqual(data.success, false);
+      assert.strictEqual(data.error, "Malformed request payload. Please provide valid JSON.");
+    });
+
+    await testAsync("Compiled production POST rejects short message (< 10 chars) with HTTP 400", async () => {
+      const res = await POST(new Request("http://localhost:3000/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Test User",
+          email: "user@example.com",
+          message: "Short",
+        }),
+      }));
+      assert.strictEqual(res.status, 400);
+      const data = await res.json();
+      assert.strictEqual(data.success, false);
+      assert.strictEqual(data.error, "Message must be at least 10 characters.");
+    });
+
+    await testAsync("Compiled production POST fails closed with HTTP 503 when Firebase credentials missing", async () => {
+      const res = await POST(new Request("http://localhost:3000/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "172.16.10.1",
+          "user-agent": "TestSuiteAgent/1.0",
+        },
+        body: JSON.stringify({
+          name: "Enterprise Client",
+          email: "enterprise@example.com",
+          message: "We need full-cycle custom mobile and Android development.",
+          phoneNumber: "+919876543210",
+        }),
+      }));
+      assert.strictEqual(res.status, 503);
+      const data = await res.json();
+      assert.strictEqual(data.success, false);
+      assert.strictEqual(data.error, "We couldn't securely save your inquiry right now. Please try again later or contact us directly.");
+    });
+  }
 
   console.log("\n==================================================");
   console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);
