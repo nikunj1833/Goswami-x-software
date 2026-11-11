@@ -411,6 +411,15 @@ async function runTests() {
     assert.strictEqual(pkg.engines.node.includes("22"), true);
   });
 
+  test("src/lib/firebase/admin.ts uses lazy auth loading to prevent ERR_REQUIRE_ESM crashes", () => {
+    const adminPath = path.resolve("src/lib/firebase/admin.ts");
+    const source = fs.readFileSync(adminPath, "utf8");
+    // Ensure top-level eager import of getAuth from firebase-admin/auth is NOT present
+    assert.strictEqual(source.includes('import { getAuth'), false);
+    // Ensure lazy getter for auth is used
+    assert.strictEqual(source.includes('get auth()'), true);
+  });
+
   // --- Group 8: Resend Email & Meta WhatsApp Template Verification ---
   console.log("\nGroup 8: Resend Email & Meta WhatsApp Template Clients");
 
