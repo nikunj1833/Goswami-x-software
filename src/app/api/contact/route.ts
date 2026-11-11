@@ -6,7 +6,6 @@ import {
   getAdminApp,
   hasFirebaseServerCredentials,
   FieldValue,
-  Timestamp,
 } from "@/lib/firebase/admin";
 import { sendInquiryEmailNotification } from "@/lib/email/client";
 import { sendInquiryWhatsAppTemplateNotification } from "@/lib/whatsapp/client";
@@ -127,17 +126,28 @@ export async function POST(request: Request) {
         );
       }
 
-      // Check for recent duplicate within 5 minutes in Firestore
+      // Check for recent duplicate within 5 minutes in Firestore (single-field index safe)
       try {
-        const fiveMinutesAgo = Timestamp.fromMillis(fiveMinutesAgoMs);
         const existingDuplicates = await db
           .collection("contactSubmissions")
           .where("submissionHash", "==", submissionHash)
-          .where("createdAt", ">=", fiveMinutesAgo)
-          .limit(1)
+          .limit(5)
           .get();
 
-        if (!existingDuplicates.empty) {
+        const isRecentDuplicate =
+          !existingDuplicates.empty &&
+          existingDuplicates.docs.some((doc) => {
+            const data = doc.data();
+            const createdAtMs =
+              typeof data.createdAt?.toMillis === "function"
+                ? data.createdAt.toMillis()
+                : data.createdAtIso
+                ? new Date(data.createdAtIso).getTime()
+                : 0;
+            return createdAtMs >= fiveMinutesAgoMs;
+          });
+
+        if (isRecentDuplicate) {
           // Idempotent: return success without duplicate writes or notifications
           return NextResponse.json({
             success: true,
@@ -267,15 +277,26 @@ export async function POST(request: Request) {
     if (hasFirebaseServerCredentials()) {
       try {
         const { db } = getAdminApp();
-        const fiveMinutesAgo = Timestamp.fromMillis(fiveMinutesAgoMs);
         const existingDuplicates = await db
           .collection("contactSubmissions")
           .where("submissionHash", "==", submissionHash)
-          .where("createdAt", ">=", fiveMinutesAgo)
-          .limit(1)
+          .limit(5)
           .get();
 
-        if (!existingDuplicates.empty) {
+        const isRecentDuplicate =
+          !existingDuplicates.empty &&
+          existingDuplicates.docs.some((doc) => {
+            const data = doc.data();
+            const createdAtMs =
+              typeof data.createdAt?.toMillis === "function"
+                ? data.createdAt.toMillis()
+                : data.createdAtIso
+                ? new Date(data.createdAtIso).getTime()
+                : 0;
+            return createdAtMs >= fiveMinutesAgoMs;
+          });
+
+        if (isRecentDuplicate) {
           return NextResponse.json({
             success: true,
             message: "Your message has already been received. Thank you!",

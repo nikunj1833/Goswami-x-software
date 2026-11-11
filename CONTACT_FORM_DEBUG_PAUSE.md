@@ -124,3 +124,4 @@ To achieve complete end-to-end Firestore persistence and email/WhatsApp notifica
 9. `WHATSAPP_NOTIFICATION_TO`: Destination WhatsApp recipient phone number (international format without `+`).
 10. `WHATSAPP_TEMPLATE_NAME`: Approved template name.
 11. `WHATSAPP_TEMPLATE_LANGUAGE`: Template language (e.g. `en_US`).
+
