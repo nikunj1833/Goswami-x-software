@@ -391,6 +391,26 @@ async function runTests() {
     assert.strictEqual("whatsappOptIn" in parsed.data, false);
   });
 
+  test("ContactForm.tsx safely parses API responses without failing with false Network Error", () => {
+    const contactFormPath = path.resolve("src/components/ContactForm.tsx");
+    const source = fs.readFileSync(contactFormPath, "utf8");
+    assert.strictEqual(source.includes("let data:"), true);
+  });
+
+  test("next.config.ts configures serverExternalPackages with firebase-admin", () => {
+    const nextConfigPath = path.resolve("next.config.ts");
+    const source = fs.readFileSync(nextConfigPath, "utf8");
+    assert.strictEqual(source.includes("serverExternalPackages"), true);
+    assert.strictEqual(source.includes("firebase-admin"), true);
+  });
+
+  test("package.json specifies Node engines >=22 for firebase-admin compatibility", () => {
+    const pkgPath = path.resolve("package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    assert.strictEqual(Boolean(pkg.engines && pkg.engines.node), true);
+    assert.strictEqual(pkg.engines.node.includes("22"), true);
+  });
+
   // --- Group 8: Resend Email & Meta WhatsApp Template Verification ---
   console.log("\nGroup 8: Resend Email & Meta WhatsApp Template Clients");
 

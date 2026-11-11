@@ -26,20 +26,25 @@ export function getAdminApp(): { app: App; auth: Auth; db: Firestore } {
     adminApp = existingApps[0];
   } else {
     const config = getFirebaseServerConfig();
+    const projectId =
+      config.projectId ||
+      process.env.FIREBASE_PROJECT_ID ||
+      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+      "goswami-x-software";
 
     if (config.clientEmail && config.privateKey) {
       adminApp = initializeApp({
         credential: cert({
-          projectId: config.projectId,
+          projectId,
           clientEmail: config.clientEmail,
           privateKey: config.privateKey,
         }),
-        projectId: config.projectId,
+        projectId,
       });
     } else {
       // Fallback to project ID / default application credentials (GCP / Firebase environment)
       adminApp = initializeApp({
-        projectId: config.projectId,
+        projectId,
       });
     }
   }

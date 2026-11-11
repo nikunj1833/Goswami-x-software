@@ -58,13 +58,18 @@ export default function ContactForm() {
         }),
       });
 
-      const data = await res.json();
+      let data: { success?: boolean; error?: string; message?: string } | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Non-JSON or empty response from server
+      }
 
-      if (!res.ok || !data.success) {
+      if (!res.ok || !data?.success) {
         setFeedback({
           type: "error",
           text:
-            data.error ||
+            data?.error ||
             "We couldn't securely save your inquiry right now. Please try again later or contact us directly.",
         });
       } else {
