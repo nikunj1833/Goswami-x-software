@@ -491,6 +491,13 @@ async function runTests() {
 
       const config3 = getFirebaseServerConfig();
       assert.strictEqual(config3.privateKey, rawPem);
+
+      // Test 4: Raw base64 key body without PEM headers
+      const sampleBody = "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC6".repeat(30); // > 500 chars
+      process.env.FIREBASE_PRIVATE_KEY = sampleBody;
+
+      const config4 = getFirebaseServerConfig();
+      assert.strictEqual(config4.privateKey, `-----BEGIN PRIVATE KEY-----\n${sampleBody}\n-----END PRIVATE KEY-----\n`);
     } finally {
       if (originalEmail !== undefined) process.env.FIREBASE_CLIENT_EMAIL = originalEmail;
       else delete process.env.FIREBASE_CLIENT_EMAIL;

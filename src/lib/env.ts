@@ -92,20 +92,31 @@ export function getFirebaseServerConfig(): FirebaseServerConfig {
       privateKey = privateKey.slice(1, -1).trim();
     }
 
-    // Handle base64 encoded private key if provided that way in CI
-    if (!privateKey.includes("BEGIN PRIVATE KEY") && privateKey.includes("LS0tLS1CRUdJTi")) {
+    // Replace escaped newlines if passed in single-line env string
+    privateKey = privateKey.replace(/\\n/g, "\n");
+
+    // Handle base64 encoded full PEM if provided that way in CI or secret managers
+    if (!privateKey.includes("BEGIN")) {
       try {
-        const decoded = Buffer.from(privateKey, "base64").toString("utf8");
-        if (decoded.includes("BEGIN PRIVATE KEY")) {
-          privateKey = decoded;
+        const stripped = privateKey.replace(/\s+/g, "");
+        const decoded = Buffer.from(stripped, "base64").toString("utf8");
+        if (decoded.includes("BEGIN") && decoded.includes("KEY")) {
+          privateKey = decoded.replace(/\\n/g, "\n");
         }
       } catch {
         // Keep original
       }
     }
 
-    // Replace escaped newlines if passed in single-line env string
-    privateKey = privateKey.replace(/\\n/g, "\n");
+    // Handle raw PKCS#8 or RSA key body pasted without "-----BEGIN PRIVATE KEY-----" wrapper
+    if (
+      !privateKey.includes("BEGIN") &&
+      /^[A-Za-z0-9+/=\s]+$/.test(privateKey) &&
+      privateKey.replace(/\s+/g, "").length > 500
+    ) {
+      const cleanBody = privateKey.trim();
+      privateKey = `-----BEGIN PRIVATE KEY-----\n${cleanBody}\n-----END PRIVATE KEY-----\n`;
+    }
   }
 
   return {
