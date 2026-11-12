@@ -746,7 +746,7 @@ async function runTests() {
     const config = {
       resendApiKey: "re_valid_api_key_123",
       notificationEmail: "owner@example.com",
-      emailFrom: "RN Developer <onboarding@resend.dev>",
+      emailFrom: "RN Developer <notifications@rndeveloper.in>",
     };
 
     const inquiry = {
@@ -771,7 +771,7 @@ async function runTests() {
 
     const sentBody = JSON.parse(capturedOptions.body);
     assert.deepStrictEqual(sentBody.to, ["owner@example.com"]);
-    assert.strictEqual(sentBody.from, "RN Developer <onboarding@resend.dev>");
+    assert.strictEqual(sentBody.from, "RN Developer <notifications@rndeveloper.in>");
     assert.strictEqual(sentBody.reply_to, "client@example.com");
     assert.strictEqual(sentBody.subject.includes("Enterprise Client"), true);
     assert.strictEqual(sentBody.headers["X-Entity-Ref-ID"], "inq-uuid-456");

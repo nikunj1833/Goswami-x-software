@@ -136,7 +136,7 @@ export function getEmailConfig(): EmailConfig {
   return {
     resendApiKey: process.env.RESEND_API_KEY || "",
     notificationEmail: process.env.CONTACT_NOTIFICATION_EMAIL || "",
-    emailFrom: process.env.EMAIL_FROM || "RN Developer <onboarding@resend.dev>",
+    emailFrom: process.env.EMAIL_FROM || "RN Developer <notifications@rndeveloper.in>",
   };
 }
 
