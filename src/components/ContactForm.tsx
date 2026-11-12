@@ -7,23 +7,25 @@ export default function ContactForm() {
   const { user } = useAuth();
   const [nameInput, setNameInput] = useState<string | null>(null);
   const [emailInput, setEmailInput] = useState<string | null>(null);
+  const [phoneInput, setPhoneInput] = useState<string | null>(null);
   const [projectType, setProjectType] = useState("");
   const [message, setMessage] = useState("");
-  const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const name = nameInput !== null ? nameInput : user?.name || "";
   const email = emailInput !== null ? emailInput : user?.email || "";
+  const phone = phoneInput !== null ? phoneInput : user?.phoneNumber || "";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     setFeedback(null);
 
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
     const trimmedMsg = message.trim();
-    const trimmedPhone = phone.trim() || user?.phoneNumber || undefined;
+    const trimmedPhone = phone.trim() || undefined;
 
     if (!trimmedName) {
       setFeedback({ type: "error", text: "Please provide your full name." });
@@ -58,7 +60,7 @@ export default function ContactForm() {
         }),
       });
 
-      let data: { success?: boolean; error?: string; message?: string } | null = null;
+      let data: { success?: boolean; error?: string; message?: string; isDuplicate?: boolean } | null = null;
       try {
         data = await res.json();
       } catch {
@@ -72,13 +74,22 @@ export default function ContactForm() {
             data?.error ||
             "We couldn't securely save your inquiry right now. Please try again later or contact us directly.",
         });
+      } else if (data.isDuplicate) {
+        setFeedback({
+          type: "success",
+          text: data.message || "Your message has already been received. Thank you!",
+        });
       } else {
         setFeedback({
           type: "success",
           text: data.message || "Thank you for reaching out! Your inquiry has been received.",
         });
-        setMessage("");
+        // Clear all fields on successful persistence
+        setNameInput("");
+        setEmailInput("");
+        setPhoneInput("");
         setProjectType("");
+        setMessage("");
       }
     } catch {
       setFeedback({
@@ -154,8 +165,8 @@ export default function ContactForm() {
           type="tel"
           autoComplete="tel"
           placeholder="e.g. +91 98765 43210"
-          value={phone || user?.phoneNumber || ""}
-          onChange={(e) => setPhone(e.target.value)}
+          value={phone}
+          onChange={(e) => setPhoneInput(e.target.value)}
           disabled={submitting}
           className="field w-full rounded-lg px-4 py-3 text-sm outline-none"
         />
@@ -228,7 +239,7 @@ export default function ContactForm() {
         className="btn-primary w-full rounded-full px-6 py-3.5 text-sm font-medium cursor-pointer transition-opacity disabled:opacity-50"
         style={{ color: "var(--bg)" }}
       >
-        {submitting ? "Sending inquiry..." : "Send Project Inquiry"}
+        {submitting ? "Sending..." : "Send Project Inquiry"}
       </button>
 
       <p id="cf-note" className="text-center text-xs" style={{ color: "var(--fg-soft)" }}>

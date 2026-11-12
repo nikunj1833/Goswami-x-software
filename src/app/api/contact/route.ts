@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import crypto from "crypto";
 import { contactFormSchema } from "@/lib/validations/contact";
 import { checkRateLimit, getClientIp } from "@/lib/security/rateLimit";
@@ -11,6 +11,30 @@ import { sendInquiryEmailNotification } from "@/lib/email/client";
 import { sendInquiryWhatsAppTemplateNotification } from "@/lib/whatsapp/client";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Executes a notification dispatch task asynchronously.
+ * In a Next.js / Vercel request lifecycle, schedules background execution via `after`
+ * (backed by Vercel serverless waitUntil) so the visitor receives an immediate HTTP response
+ * as soon as Firestore persistence completes without risking premature function freezing.
+ */
+function scheduleNotificationDispatch(task: () => Promise<void>) {
+  try {
+    after(async () => {
+      try {
+        await task();
+      } catch (err) {
+        console.error("[Notification Background Error]", err);
+      }
+    });
+  } catch {
+    // If invoked outside Next.js request lifecycle (e.g. in direct unit tests),
+    // execute asynchronously without blocking
+    task().catch((err) => {
+      console.error("[Notification Background Error]", err);
+    });
+  }
+}
 
 interface DevInflightSubmission {
   id: string;
@@ -151,6 +175,7 @@ export async function POST(request: Request) {
           // Idempotent: return success without duplicate writes or notifications
           return NextResponse.json({
             success: true,
+            isDuplicate: true,
             message: "Your message has already been received. Thank you!",
           });
         }
@@ -227,6 +252,7 @@ export async function POST(request: Request) {
         if (isConcurrentDuplicate) {
           return NextResponse.json({
             success: true,
+            isDuplicate: true,
             message: "Your message has already been received. Thank you!",
           });
         }
@@ -244,53 +270,57 @@ export async function POST(request: Request) {
         );
       }
 
-      // Step 4 & 5: Trigger Email and WhatsApp notifications concurrently AFTER Firestore write
-      const [emailResult, whatsappResult] = await Promise.all([
-        sendInquiryEmailNotification({
-          id: submissionId,
-          name,
-          email,
-          phoneNumber: phoneNumber || null,
-          message,
-          createdAtIso,
-        }),
-        sendInquiryWhatsAppTemplateNotification({
-          id: submissionId,
-          name,
-          email,
-          phoneNumber: phoneNumber || null,
-          message,
-          createdAtIso,
-        }),
-      ]);
+      // Step 4 & 5: Dispatch Email and WhatsApp notifications reliably via Next.js `after` (backed by Vercel waitUntil).
+      // The visitor receives immediate success feedback as soon as Firestore persistence completes,
+      // while serverless background execution reliably dispatches notifications and updates document delivery status.
+      scheduleNotificationDispatch(async () => {
+        const [emailResult, whatsappResult] = await Promise.all([
+          sendInquiryEmailNotification({
+            id: submissionId,
+            name,
+            email,
+            phoneNumber: phoneNumber || null,
+            message,
+            createdAtIso,
+          }),
+          sendInquiryWhatsAppTemplateNotification({
+            id: submissionId,
+            name,
+            email,
+            phoneNumber: phoneNumber || null,
+            message,
+            createdAtIso,
+          }),
+        ]);
 
-      // Update Firestore document with exact delivery status
-      try {
-        await db.collection("contactSubmissions").doc(submissionId).update({
-          emailNotification: {
-            status: emailResult.status,
-            attemptedAt: emailResult.attemptedAt,
-            sentAt: emailResult.sentAt || null,
-            messageId: emailResult.messageId || null,
-            errorCode: emailResult.errorCode || null,
-            error: emailResult.error || null,
-          },
-          whatsappNotification: {
-            status: whatsappResult.status,
-            attemptedAt: whatsappResult.attemptedAt,
-            sentAt: whatsappResult.sentAt || null,
-            messageId: whatsappResult.messageId || null,
-            errorCode: whatsappResult.errorCode || null,
-            error: whatsappResult.error || null,
-          },
-          notificationDispatchedAt: FieldValue.serverTimestamp(),
-        });
-      } catch (updateErr) {
-        console.warn(
-          "[Contact Form] Notification status update warning:",
-          updateErr instanceof Error ? updateErr.message : updateErr
-        );
-      }
+        // Update Firestore document with exact delivery status
+        try {
+          await db.collection("contactSubmissions").doc(submissionId).update({
+            emailNotification: {
+              status: emailResult.status,
+              attemptedAt: emailResult.attemptedAt,
+              sentAt: emailResult.sentAt || null,
+              messageId: emailResult.messageId || null,
+              errorCode: emailResult.errorCode || null,
+              error: emailResult.error || null,
+            },
+            whatsappNotification: {
+              status: whatsappResult.status,
+              attemptedAt: whatsappResult.attemptedAt,
+              sentAt: whatsappResult.sentAt || null,
+              messageId: whatsappResult.messageId || null,
+              errorCode: whatsappResult.errorCode || null,
+              error: whatsappResult.error || null,
+            },
+            notificationDispatchedAt: FieldValue.serverTimestamp(),
+          });
+        } catch (updateErr) {
+          console.warn(
+            "[Contact Form] Notification status update warning:",
+            updateErr instanceof Error ? updateErr.message : updateErr
+          );
+        }
+      });
 
       return NextResponse.json({
         success: true,
@@ -329,6 +359,7 @@ export async function POST(request: Request) {
         if (isRecentDuplicate) {
           return NextResponse.json({
             success: true,
+            isDuplicate: true,
             message: "Your message has already been received. Thank you!",
           });
         }
@@ -385,6 +416,7 @@ export async function POST(request: Request) {
         if (item.submissionHash === submissionHash && item.createdAt >= fiveMinutesAgoMs) {
           return NextResponse.json({
             success: true,
+            isDuplicate: true,
             message: "Your message has already been received. Thank you!",
           });
         }
@@ -403,56 +435,58 @@ export async function POST(request: Request) {
       });
     }
 
-    // Trigger dev notifications
-    const [emailResult, whatsappResult] = await Promise.all([
-      sendInquiryEmailNotification({
-        id: submissionId,
-        name,
-        email,
-        phoneNumber: phoneNumber || null,
-        message,
-        createdAtIso,
-      }),
-      sendInquiryWhatsAppTemplateNotification({
-        id: submissionId,
-        name,
-        email,
-        phoneNumber: phoneNumber || null,
-        message,
-        createdAtIso,
-      }),
-    ]);
+    // Trigger dev notifications asynchronously via scheduleNotificationDispatch
+    scheduleNotificationDispatch(async () => {
+      const [emailResult, whatsappResult] = await Promise.all([
+        sendInquiryEmailNotification({
+          id: submissionId,
+          name,
+          email,
+          phoneNumber: phoneNumber || null,
+          message,
+          createdAtIso,
+        }),
+        sendInquiryWhatsAppTemplateNotification({
+          id: submissionId,
+          name,
+          email,
+          phoneNumber: phoneNumber || null,
+          message,
+          createdAtIso,
+        }),
+      ]);
 
-    if (firestorePersisted) {
-      try {
-        const { db } = getAdminApp();
-        await db.collection("contactSubmissions").doc(submissionId).update({
-          emailNotification: {
-            status: emailResult.status,
-            attemptedAt: emailResult.attemptedAt,
-            sentAt: emailResult.sentAt || null,
-            messageId: emailResult.messageId || null,
-            errorCode: emailResult.errorCode || null,
-            error: emailResult.error || null,
-          },
-          whatsappNotification: {
-            status: whatsappResult.status,
-            attemptedAt: whatsappResult.attemptedAt,
-            sentAt: whatsappResult.sentAt || null,
-            messageId: whatsappResult.messageId || null,
-            errorCode: whatsappResult.errorCode || null,
-            error: whatsappResult.error || null,
-          },
-          notificationDispatchedAt: FieldValue.serverTimestamp(),
-        });
-      } catch {}
-    } else {
-      const devEntry = devMemorySubmissions.get(submissionId);
-      if (devEntry) {
-        devEntry.emailStatus = emailResult.status;
-        devEntry.whatsappStatus = whatsappResult.status;
+      if (firestorePersisted) {
+        try {
+          const { db } = getAdminApp();
+          await db.collection("contactSubmissions").doc(submissionId).update({
+            emailNotification: {
+              status: emailResult.status,
+              attemptedAt: emailResult.attemptedAt,
+              sentAt: emailResult.sentAt || null,
+              messageId: emailResult.messageId || null,
+              errorCode: emailResult.errorCode || null,
+              error: emailResult.error || null,
+            },
+            whatsappNotification: {
+              status: whatsappResult.status,
+              attemptedAt: whatsappResult.attemptedAt,
+              sentAt: whatsappResult.sentAt || null,
+              messageId: whatsappResult.messageId || null,
+              errorCode: whatsappResult.errorCode || null,
+              error: whatsappResult.error || null,
+            },
+            notificationDispatchedAt: FieldValue.serverTimestamp(),
+          });
+        } catch {}
+      } else {
+        const devEntry = devMemorySubmissions.get(submissionId);
+        if (devEntry) {
+          devEntry.emailStatus = emailResult.status;
+          devEntry.whatsappStatus = whatsappResult.status;
+        }
       }
-    }
+    });
 
     return NextResponse.json({
       success: true,

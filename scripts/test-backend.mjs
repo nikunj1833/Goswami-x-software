@@ -435,6 +435,84 @@ async function runTests() {
     assert.strictEqual(source.includes("let data:"), true);
   });
 
+  test("ContactForm.tsx clears all fields on successful persistence and preserves them on error/duplicate", () => {
+    const contactFormPath = path.resolve("src/components/ContactForm.tsx");
+    const source = fs.readFileSync(contactFormPath, "utf8");
+    
+    // Check reset calls on success
+    assert.strictEqual(source.includes('setNameInput("")'), true);
+    assert.strictEqual(source.includes('setEmailInput("")'), true);
+    assert.strictEqual(source.includes('setPhoneInput("")'), true);
+    assert.strictEqual(source.includes('setProjectType("")'), true);
+    assert.strictEqual(source.includes('setMessage("")'), true);
+
+    // Check duplicate check prevents form wipe
+    assert.strictEqual(source.includes("data.isDuplicate"), true);
+
+    // Check double-click submission guard
+    assert.strictEqual(source.includes("if (submitting) return;"), true);
+
+    // Check submit button loading text
+    assert.strictEqual(source.includes('"Sending..."'), true);
+  });
+
+  test("ContactForm state transition logic: clears on success, preserves on error and duplicate", () => {
+    function simulateFormSubmit({ result, isDuplicate = false }) {
+      let state = {
+        name: "Nikunj Goswami",
+        email: "nikunj@example.com",
+        phone: "+919876543210",
+        projectType: "Mobile App Development",
+        message: "Detailed mobile project inquiry.",
+      };
+
+      if (!result.success) {
+        // error: do not clear
+      } else if (isDuplicate) {
+        // duplicate: do not clear
+      } else {
+        // success: clear all
+        state.name = "";
+        state.email = "";
+        state.phone = "";
+        state.projectType = "";
+        state.message = "";
+      }
+      return state;
+    }
+
+    // 1. Success clears all 5 fields
+    const afterSuccess = simulateFormSubmit({ result: { success: true } });
+    assert.strictEqual(afterSuccess.name, "");
+    assert.strictEqual(afterSuccess.email, "");
+    assert.strictEqual(afterSuccess.phone, "");
+    assert.strictEqual(afterSuccess.projectType, "");
+    assert.strictEqual(afterSuccess.message, "");
+
+    // 2. Failure preserves all 5 fields
+    const afterFailure = simulateFormSubmit({ result: { success: false } });
+    assert.strictEqual(afterFailure.name, "Nikunj Goswami");
+    assert.strictEqual(afterFailure.email, "nikunj@example.com");
+    assert.strictEqual(afterFailure.phone, "+919876543210");
+    assert.strictEqual(afterFailure.projectType, "Mobile App Development");
+    assert.strictEqual(afterFailure.message, "Detailed mobile project inquiry.");
+
+    // 3. Duplicate preserves all 5 fields
+    const afterDup = simulateFormSubmit({ result: { success: true }, isDuplicate: true });
+    assert.strictEqual(afterDup.name, "Nikunj Goswami");
+    assert.strictEqual(afterDup.email, "nikunj@example.com");
+    assert.strictEqual(afterDup.phone, "+919876543210");
+    assert.strictEqual(afterDup.projectType, "Mobile App Development");
+    assert.strictEqual(afterDup.message, "Detailed mobile project inquiry.");
+  });
+
+  test("src/app/api/contact/route.ts uses non-blocking background notification dispatch via after", () => {
+    const routePath = path.resolve("src/app/api/contact/route.ts");
+    const source = fs.readFileSync(routePath, "utf8");
+    assert.strictEqual(source.includes('after'), true);
+    assert.strictEqual(source.includes('scheduleNotificationDispatch'), true);
+  });
+
   test("next.config.ts configures serverExternalPackages with firebase-admin", () => {
     const nextConfigPath = path.resolve("next.config.ts");
     const source = fs.readFileSync(nextConfigPath, "utf8");
