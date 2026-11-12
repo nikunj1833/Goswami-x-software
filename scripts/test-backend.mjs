@@ -458,6 +458,48 @@ async function runTests() {
     assert.strictEqual(source.includes('get auth()'), true);
   });
 
+  test("src/lib/env.ts getFirebaseServerConfig safely normalizes quotes, whitespace, and newlines (functional test)", async () => {
+    const originalEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const originalKey = process.env.FIREBASE_PRIVATE_KEY;
+
+    try {
+      const { getFirebaseServerConfig } = await import("../src/lib/env.ts");
+
+      // Test 1: Quotes and whitespace padding
+      process.env.FIREBASE_CLIENT_EMAIL = '  "service-acct@project.iam.gserviceaccount.com"  ';
+      process.env.FIREBASE_PRIVATE_KEY = '  "-----BEGIN PRIVATE KEY-----\\nMIIEvgIBADANBgk\\n-----END PRIVATE KEY-----\\n"  ';
+
+      const config1 = getFirebaseServerConfig();
+      assert.strictEqual(config1.clientEmail, "service-acct@project.iam.gserviceaccount.com");
+      assert.strictEqual(config1.privateKey, "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgk\n-----END PRIVATE KEY-----\n");
+
+      // Test 2: JSON payload pasted into private key
+      delete process.env.FIREBASE_CLIENT_EMAIL;
+      process.env.FIREBASE_PRIVATE_KEY = JSON.stringify({
+        client_email: "extracted@project.iam.gserviceaccount.com",
+        private_key: "-----BEGIN PRIVATE KEY-----\\nJSON_KEY\\n-----END PRIVATE KEY-----",
+      });
+
+      const config2 = getFirebaseServerConfig();
+      assert.strictEqual(config2.clientEmail, "extracted@project.iam.gserviceaccount.com");
+      assert.strictEqual(config2.privateKey, "-----BEGIN PRIVATE KEY-----\nJSON_KEY\n-----END PRIVATE KEY-----");
+
+      // Test 3: Base64 encoded PEM key
+      const rawPem = "-----BEGIN PRIVATE KEY-----\nMII_BASE64_KEY\n-----END PRIVATE KEY-----";
+      process.env.FIREBASE_CLIENT_EMAIL = "b64@project.iam.gserviceaccount.com";
+      process.env.FIREBASE_PRIVATE_KEY = Buffer.from(rawPem).toString("base64");
+
+      const config3 = getFirebaseServerConfig();
+      assert.strictEqual(config3.privateKey, rawPem);
+    } finally {
+      if (originalEmail !== undefined) process.env.FIREBASE_CLIENT_EMAIL = originalEmail;
+      else delete process.env.FIREBASE_CLIENT_EMAIL;
+
+      if (originalKey !== undefined) process.env.FIREBASE_PRIVATE_KEY = originalKey;
+      else delete process.env.FIREBASE_PRIVATE_KEY;
+    }
+  });
+
   // --- Group 8: Resend Email & Meta WhatsApp Template Verification ---
   console.log("\nGroup 8: Resend Email & Meta WhatsApp Template Clients");
 

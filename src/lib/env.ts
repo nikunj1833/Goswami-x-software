@@ -49,19 +49,61 @@ export function getFirebaseServerConfig(): FirebaseServerConfig {
   const projectId =
     process.env.FIREBASE_PROJECT_ID ||
     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
-    "";
+    "goswami-x-software";
 
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  let clientEmail = (
+    process.env.FIREBASE_CLIENT_EMAIL ||
+    process.env.FIREBASE_SERVICE_ACCOUNT_EMAIL ||
+    process.env.GOOGLE_CLIENT_EMAIL
+  )?.trim();
+
+  if (clientEmail) {
+    if (
+      (clientEmail.startsWith('"') && clientEmail.endsWith('"')) ||
+      (clientEmail.startsWith("'") && clientEmail.endsWith("'"))
+    ) {
+      clientEmail = clientEmail.slice(1, -1).trim();
+    }
+  }
+
+  let privateKey = (
+    process.env.FIREBASE_PRIVATE_KEY ||
+    process.env.FIREBASE_SERVICE_ACCOUNT_KEY ||
+    process.env.GOOGLE_PRIVATE_KEY
+  )?.trim();
 
   if (privateKey) {
+    // If the entire service account JSON was accidentally pasted into the private key field:
+    if (privateKey.startsWith("{") && privateKey.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(privateKey);
+        if (parsed.private_key) privateKey = String(parsed.private_key).trim();
+        if (parsed.client_email && !clientEmail) clientEmail = String(parsed.client_email).trim();
+      } catch {
+        // Not valid JSON, proceed with normal string handling
+      }
+    }
+
     // Strip wrapping quotes if user pasted with quotes
     if (
       (privateKey.startsWith('"') && privateKey.endsWith('"')) ||
       (privateKey.startsWith("'") && privateKey.endsWith("'"))
     ) {
-      privateKey = privateKey.slice(1, -1);
+      privateKey = privateKey.slice(1, -1).trim();
     }
+
+    // Handle base64 encoded private key if provided that way in CI
+    if (!privateKey.includes("BEGIN PRIVATE KEY") && privateKey.includes("LS0tLS1CRUdJTi")) {
+      try {
+        const decoded = Buffer.from(privateKey, "base64").toString("utf8");
+        if (decoded.includes("BEGIN PRIVATE KEY")) {
+          privateKey = decoded;
+        }
+      } catch {
+        // Keep original
+      }
+    }
+
     // Replace escaped newlines if passed in single-line env string
     privateKey = privateKey.replace(/\\n/g, "\n");
   }
