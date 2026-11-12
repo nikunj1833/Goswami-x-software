@@ -18,6 +18,16 @@ export async function GET() {
       hasPrivateKey: Boolean(config.privateKey),
       clientEmailValid: Boolean(config.clientEmail?.includes("@")),
       privateKeyValid: Boolean(config.privateKey?.includes("BEGIN PRIVATE KEY")),
+      keyDiagnostics: {
+        length: config.privateKey ? config.privateKey.length : 0,
+        startsWithDash: Boolean(config.privateKey?.startsWith("-")),
+        containsBegin: Boolean(config.privateKey?.includes("BEGIN")),
+        containsPrivate: Boolean(config.privateKey?.toLowerCase().includes("private")),
+        containsRsa: Boolean(config.privateKey?.includes("RSA")),
+        hasNewlines: Boolean(config.privateKey?.includes("\n")),
+        isHex: Boolean(config.privateKey && /^[0-9a-fA-F]+$/.test(config.privateKey)),
+        isBase64Candidate: Boolean(config.privateKey && /^[A-Za-z0-9+/=\r\n]+$/.test(config.privateKey)),
+      },
     },
   });
 }
