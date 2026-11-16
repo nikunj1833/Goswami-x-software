@@ -18,23 +18,26 @@ export default function ApproachSection() {
         <div className="mt-12 grid gap-5 md:grid-cols-3">
           <div className="reveal card-frame">
             <div
-              className="card-inner relative h-full overflow-hidden p-7"
-              style={{ background: "#FBF7F1" }}
+              className="card-inner relative h-full overflow-hidden rounded-2xl border p-7 transition-all duration-300 hover:border-[var(--accent)]"
+              style={{
+                borderColor: "var(--line)",
+                background: "linear-gradient(155deg, var(--surface) 0%, var(--bg-soft) 100%)",
+              }}
             >
               <span
                 className="pointer-events-none absolute -right-1 -top-4 font-serif text-7xl italic select-none"
-                style={{ color: "#3F200D", opacity: 0.16 }}
+                style={{ color: "var(--accent)", opacity: 0.16 }}
               >
                 01
               </span>
               <span
                 className="stack-divider block"
-                style={{ background: "#B8611F", width: "2.5rem", opacity: 1 }}
+                style={{ background: "var(--accent)", width: "2.5rem", opacity: 1 }}
               />
-              <h3 className="mt-5 font-serif text-xl" style={{ color: "#3F200D" }}>
+              <h3 className="mt-5 font-serif text-xl" style={{ color: "var(--fg)" }}>
                 Real projects, not templates
               </h3>
-              <p className="mt-3 text-sm leading-relaxed" style={{ color: "#6E523E" }}>
+              <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--fg-soft)" }}>
                 Everything here is something I designed and built myself, end to end — not a copied
                 template or tutorial clone.
               </p>
@@ -43,23 +46,26 @@ export default function ApproachSection() {
 
           <div className="reveal reveal-delay-1 card-frame">
             <div
-              className="card-inner relative h-full overflow-hidden p-7"
-              style={{ background: "linear-gradient(155deg,#4A2A17,#26150A)" }}
+              className="card-inner relative h-full overflow-hidden rounded-2xl border p-7 transition-all duration-300 hover:border-[var(--accent)]"
+              style={{
+                borderColor: "var(--line)",
+                background: "linear-gradient(155deg, var(--surface) 0%, var(--bg-soft) 100%)",
+              }}
             >
               <span
                 className="pointer-events-none absolute -right-1 -top-4 font-serif text-7xl italic select-none"
-                style={{ color: "#FFFFFF", opacity: 0.16 }}
+                style={{ color: "var(--accent)", opacity: 0.16 }}
               >
                 02
               </span>
               <span
                 className="stack-divider block"
-                style={{ background: "#F0A15A", width: "2.5rem", opacity: 1 }}
+                style={{ background: "var(--accent)", width: "2.5rem", opacity: 1 }}
               />
-              <h3 className="mt-5 font-serif text-xl" style={{ color: "#FFFFFF" }}>
+              <h3 className="mt-5 font-serif text-xl" style={{ color: "var(--fg)" }}>
                 AI-assisted, human-led
               </h3>
-              <p className="mt-3 text-sm leading-relaxed" style={{ color: "#E0CDBB" }}>
+              <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--fg-soft)" }}>
                 I use AI tools to move faster and learn deeper — but every decision, debug, and
                 design choice is mine.
               </p>
@@ -68,23 +74,26 @@ export default function ApproachSection() {
 
           <div className="reveal reveal-delay-2 card-frame">
             <div
-              className="card-inner relative h-full overflow-hidden p-7"
-              style={{ background: "linear-gradient(155deg,#8F5E3F,#66402A)" }}
+              className="card-inner relative h-full overflow-hidden rounded-2xl border p-7 transition-all duration-300 hover:border-[var(--accent)]"
+              style={{
+                borderColor: "var(--line)",
+                background: "linear-gradient(155deg, var(--surface) 0%, var(--bg-soft) 100%)",
+              }}
             >
               <span
                 className="pointer-events-none absolute -right-1 -top-4 font-serif text-7xl italic select-none"
-                style={{ color: "#FFFFFF", opacity: 0.16 }}
+                style={{ color: "var(--accent)", opacity: 0.16 }}
               >
                 03
               </span>
               <span
                 className="stack-divider block"
-                style={{ background: "#FFD9B0", width: "2.5rem", opacity: 1 }}
+                style={{ background: "var(--accent)", width: "2.5rem", opacity: 1 }}
               />
-              <h3 className="mt-5 font-serif text-xl" style={{ color: "#FFFFFF" }}>
+              <h3 className="mt-5 font-serif text-xl" style={{ color: "var(--fg)" }}>
                 Direct communication
               </h3>
-              <p className="mt-3 text-sm leading-relaxed" style={{ color: "#F3E1D1" }}>
+              <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--fg-soft)" }}>
                 No account managers, no ticket queues — you work directly with me from the first
                 message to final delivery.
               </p>

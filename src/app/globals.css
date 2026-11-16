@@ -544,22 +544,22 @@ section,
 
 .stack-card-1 {
   top: 5rem;
-  background: #FBF9F5;
-  color: #221B15;
+  background: var(--surface);
+  color: var(--fg);
   z-index: 1;
 }
 
 .stack-card-2 {
   top: 6.5rem;
-  background: linear-gradient(155deg, #3D2414, #241309);
-  color: #FAF7F2;
+  background: linear-gradient(155deg, var(--surface), var(--bg-soft));
+  color: var(--fg);
   z-index: 2;
 }
 
 .stack-card-3 {
   top: 8rem;
-  background: linear-gradient(155deg, #F3902B, #C9600F);
-  color: #241005;
+  background: linear-gradient(155deg, var(--surface), var(--bg-soft));
+  color: var(--fg);
   z-index: 3;
 }
 

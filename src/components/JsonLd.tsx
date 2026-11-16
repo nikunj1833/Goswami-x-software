@@ -8,6 +8,7 @@ export default function JsonLd() {
         "name": "RN Developer",
         "legalName": "RN SOFTWARE DEVELOPER",
         "url": "https://www.rndeveloper.in",
+        "logo": "https://www.rndeveloper.in/icon.png",
         "description":
           "A sole proprietorship software development business focused on mobile applications, games, and web-based software.",
         "knowsAbout": [
