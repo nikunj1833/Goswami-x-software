@@ -8,22 +8,22 @@
   "theme_color": "#0f172a",
   "icons": [
     {
-      "src": "/favicon.ico",
+      "src": "/favicon.ico?v=3",
       "sizes": "16x16 32x32 48x48",
       "type": "image/x-icon"
     },
     {
-      "src": "/icon.svg",
+      "src": "/icon.svg?v=3",
       "sizes": "any",
       "type": "image/svg+xml"
     },
     {
-      "src": "/icon.png",
+      "src": "/icon.png?v=3",
       "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "/apple-icon.png",
+      "src": "/apple-icon.png?v=3",
       "sizes": "180x180",
       "type": "image/png"
     }
