@@ -1,0 +1,31 @@
+{
+  "name": "RN Developer",
+  "short_name": "RN Developer",
+  "description": "RN Developer is an independent software development business specializing in Android applications, casual mobile games, Play Store publishing guidance, and custom web software.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#15100C",
+  "theme_color": "#15100C",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "16x16 32x32 48x48",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
