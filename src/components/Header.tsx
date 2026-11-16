@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import ThemeToggle from "./ThemeToggle";
 import { useAuth } from "@/context/AuthContext";
 
@@ -117,22 +116,10 @@ export default function Header() {
       >
         <Link
           href="/"
-          className="logo-mark group flex items-center gap-2.5 sm:gap-3 font-serif text-[1.15rem] sm:text-2xl md:text-[1.7rem]"
+          className="logo-mark font-serif text-[1.15rem] sm:text-2xl md:text-[1.7rem]"
           style={{ color: "var(--fg)" }}
         >
-          <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden shrink-0 shadow-sm border border-[var(--line)]">
-            <Image
-              src="/icon.svg"
-              alt="RN Developer"
-              width={32}
-              height={32}
-              className="w-full h-full object-cover transition-transform group-hover:scale-105"
-              priority
-            />
-          </div>
-          <span>
-            RN <span className="gradient-text italic">Developer</span>
-          </span>
+          RN <span className="gradient-text italic">Developer</span>
         </Link>
 
         <ul

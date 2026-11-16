@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import FooterWordmark from "./FooterWordmark";
 
 export default function Footer() {
@@ -30,21 +29,10 @@ export default function Footer() {
           <div className="max-w-sm">
             <Link
               href="/"
-              className="logo-mark group inline-flex items-center gap-2.5 font-serif text-2xl"
+              className="logo-mark font-serif text-2xl"
               style={{ color: "var(--fg)" }}
             >
-              <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden shrink-0 shadow-sm border border-[var(--line)]">
-                <Image
-                  src="/icon.svg"
-                  alt="RN Developer"
-                  width={32}
-                  height={32}
-                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                />
-              </div>
-              <span>
-                RN <span className="gradient-text italic">Developer</span>
-              </span>
+              RN <span className="gradient-text italic">Developer</span>
             </Link>
             <p className="mt-4 text-sm leading-relaxed" style={{ color: "var(--fg-soft)" }}>
               Software development focused on mobile applications, games, and web-based software.
